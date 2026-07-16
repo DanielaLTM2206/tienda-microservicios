@@ -6,7 +6,7 @@
 
 | Integrante | Rol | GitHub |
 |---|---|---|
-| Daniela Tituaña | Backend / Arquitectura | @daniela-tituana |
+| Daniela Tituaña | Backend / Arquitectura | @DanielaLTM2206 |
 | Stiven Molina | Transportes / Comunicacion | @stiven-molina |
 | Jeffrey Manobanda | Documentacion / QA | @jeffrey-manobanda |
 
