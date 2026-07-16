@@ -1,0 +1,20 @@
+{
+  "name": "microservicios-avance1",
+  "version": "1.0.0",
+  "description": "MVP de arquitectura de microservicios - Avance 1",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build:all": "npm run build --workspaces",
+    "start:gateway": "npm run start:dev -w gateway",
+    "start:pedidos": "npm run start:dev -w pedidos",
+    "start:productos": "npm run start:dev -w productos",
+    "start:notificaciones": "npm run start:dev -w notificaciones"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

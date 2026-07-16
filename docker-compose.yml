@@ -1,0 +1,122 @@
+# =============================================================================
+#  docker-compose.yml  —  MVP Avance 1
+#  Sistema: API Gateway + 3 Microservicios + Redis (eventos) + PostgreSQL
+#
+#  Dominio: Pedidos / Productos / Notificaciones
+#  Equipo: Daniela Tituaña · Stiven Molina · Jeffrey Manobanda
+#
+#  Levantar:   docker compose up -d --build
+#  Ver logs:   docker compose logs -f
+#  Detener:    docker compose down
+#  Prueba de acoplamiento temporal: docker compose stop svc-productos
+# =============================================================================
+
+services:
+  # ─────────────────────────────────────────────────────────────────
+  # INFRAESTRUCTURA
+  # ─────────────────────────────────────────────────────────────────
+
+  db:
+    image: postgres:16-alpine
+    container_name: ms-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ms-redis
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # MICROSERVICIOS
+  # ─────────────────────────────────────────────────────────────────
+
+  # MS B — segundo salto de la cadena síncrona
+  # (se levanta antes porque pedidos depende de él)
+  svc-productos:
+    build: ./apps/productos
+    container_name: ms-productos
+    environment:
+      TCP_PORT: 3002
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: app
+      DB_PASS: app
+      DB_NAME: app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MS C — consumidor Redis (camino asíncrono)
+  # Si este servicio se cae, el flujo asíncrono sigue aceptando peticiones
+  svc-notificaciones:
+    build: ./apps/notificaciones
+    container_name: ms-notificaciones
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MS A — inicia la cadena síncrona y publica eventos Redis
+  svc-pedidos:
+    build: ./apps/pedidos
+    container_name: ms-pedidos
+    environment:
+      TCP_PORT: 3001
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: app
+      DB_PASS: app
+      DB_NAME: app
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SVC_PRODUCTOS_HOST: ms-productos
+      SVC_PRODUCTOS_PORT: 3002
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      svc-productos:
+        condition: service_started
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # API GATEWAY — punto único de entrada HTTP
+  # ─────────────────────────────────────────────────────────────────
+  gateway:
+    build: ./apps/gateway
+    container_name: ms-gateway
+    environment:
+      PORT: 3000
+      SVC_PEDIDOS_HOST: ms-pedidos
+      SVC_PEDIDOS_PORT: 3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      svc-pedidos:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:
