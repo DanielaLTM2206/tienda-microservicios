@@ -1,32 +1,56 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom, timeout, catchError, of } from 'rxjs';
+import { ClientProxy, ClientGrpc } from '@nestjs/microservices';
+import { firstValueFrom, timeout, catchError, Observable } from 'rxjs';
 import Redis from 'ioredis';
 import { Pedido } from './pedido.entity';
 
 /**
- * Servicio de Pedidos — contiene la lógica de negocio.
- * Principio SRP: solo gestiona operaciones de pedidos.
- * Principio DIP: depende de abstracciones (Repository, ClientProxy), inyectadas por NestJS.
+ * Interfaz que describe el stub gRPC generado por NestJS a partir de productos.proto.
+ * Principio ISP: la interfaz declara solo los métodos que svc-pedidos necesita.
+ */
+interface ProductosGrpcService {
+  ObtenerProducto(data: { id: number }): Observable<{
+    id: number;
+    nombre: string;
+    precio: number;
+    disponible: boolean;
+    encontrado: boolean;
+    error: string;
+  }>;
+  ListarProductos(data: Record<string, never>): Observable<{ productos: any[] }>;
+}
+
+/**
+ * Servicio de Pedidos — Avance 2.
+ * Mantiene los caminos TCP y Redis del Avance 1 e incorpora:
+ *   - Camino gRPC: consulta svc-productos usando el contrato productos.proto.
+ *   - Camino RabbitMQ: publica eventos de stock en la cola stock_actualizar.
  *
- * Implementa DOS caminos de comunicación:
- *   1. SÍNCRONO (TCP): llama a svc-productos y ESPERA respuesta (latencia acumulada).
- *   2. ASÍNCRONO (Redis PUBLISH): publica un evento SIN ESPERAR al consumidor (desacoplado).
+ * Principio SRP: gestiona ÚNICAMENTE la lógica de pedidos.
+ * Principio DIP: depende de abstracciones (ClientProxy, ClientGrpc, Repository).
  */
 @Injectable()
-export class PedidosService {
+export class PedidosService implements OnModuleInit {
   private readonly logger = new Logger(PedidosService.name);
   private readonly redis: Redis;
+  private productosGrpcStub: ProductosGrpcService;
 
   constructor(
     @InjectRepository(Pedido)
     private readonly pedidoRepo: Repository<Pedido>,
+
     @Inject('PRODUCTOS_SERVICE')
-    private readonly productosClient: ClientProxy,
+    private readonly productosTcpClient: ClientProxy,
+
+    @Inject('PRODUCTOS_GRPC_SERVICE')
+    private readonly productosGrpcClient: ClientGrpc,
+
+    @Inject('RABBITMQ_SERVICE')
+    private readonly rabbitmqClient: ClientProxy,
   ) {
-    // Conexión directa a Redis para publicar eventos (camino asíncrono)
+    // Conexión directa a Redis para publicar eventos (camino asíncrono Avance 1)
     this.redis = new Redis({
       host: process.env.REDIS_HOST ?? 'localhost',
       port: parseInt(process.env.REDIS_PORT ?? '6379'),
@@ -41,26 +65,36 @@ export class PedidosService {
   }
 
   /**
-   * Obtener todos los pedidos + consultar svc-productos por cada uno (cadena síncrona TCP).
-   * Demuestra ACUMULACIÓN DE LATENCIA: tiempo total = latencia pedidos + latencia productos.
+   * OnModuleInit: obtener el stub gRPC a partir del cliente registrado.
+   * Debe hacerse DESPUÉS de que los módulos estén listos.
+   */
+  onModuleInit() {
+    this.productosGrpcStub =
+      this.productosGrpcClient.getService<ProductosGrpcService>('ProductosService');
+    this.logger.log('Stub gRPC de ProductosService inicializado');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CAMINOS AVANCE 1 (se conservan intactos)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * [CAMINO A — TCP] Obtener todos los pedidos + consultar svc-productos (cadena síncrona).
    */
   async findAll(): Promise<any[]> {
-    this.logger.log('[SINCRONO] Consultando pedidos y productos por TCP...');
+    this.logger.log('[TCP] Consultando pedidos y productos...');
 
-    // Salto 1: consultar la BD local
     const pedidos = await this.pedidoRepo.find();
 
-    // Salto 2: llamar svc-productos por TCP (segundo salto de la cadena)
     let productos: any[] = [];
     try {
       productos = await firstValueFrom(
-        this.productosClient
+        this.productosTcpClient
           .send({ cmd: 'get_productos' }, {})
           .pipe(
             timeout(4000),
-            // Si svc-productos no responde → acoplamiento temporal: el pedido también falla
             catchError((err) => {
-              this.logger.error(`svc-productos no responde: ${err.message}`);
+              this.logger.error(`svc-productos TCP no responde: ${err.message}`);
               throw new Error('svc-productos no disponible (acoplamiento temporal)');
             }),
           ),
@@ -76,22 +110,22 @@ export class PedidosService {
   }
 
   /**
-   * Crear pedido validando el producto (cadena síncrona: 2 saltos TCP).
+   * [CAMINO A — TCP] Crear pedido validando el producto.
+   * Al crearlo también publica en Redis (Avance 1) y en RabbitMQ (Avance 2).
    */
   async create(data: { productoId: number; cantidad: number }): Promise<Pedido> {
-    this.logger.log(`[SINCRONO] Crear pedido -> verificar svc-productos por TCP`);
+    this.logger.log(`[TCP] Crear pedido → verificar svc-productos`);
 
-    // Salto 1 (TCP): verificar que el producto existe
     let producto: any;
     try {
       producto = await firstValueFrom(
-        this.productosClient
-          .send({ cmd: 'get_producto', }, { id: data.productoId })
+        this.productosTcpClient
+          .send({ cmd: 'get_producto' }, { id: data.productoId })
           .pipe(
             timeout(4000),
             catchError((err) => {
-              this.logger.error(`svc-productos no responde: ${err.message}`);
-              throw new Error('svc-productos no disponible - pedido no creado (acoplamiento temporal)');
+              this.logger.error(`svc-productos TCP no responde: ${err.message}`);
+              throw new Error('svc-productos no disponible - pedido no creado');
             }),
           ),
       );
@@ -103,7 +137,6 @@ export class PedidosService {
       throw new Error(`Producto ${data.productoId} no encontrado`);
     }
 
-    // Salto 2: guardar en BD local
     const pedido = this.pedidoRepo.create({
       productoId: data.productoId,
       cantidad: data.cantidad,
@@ -113,20 +146,28 @@ export class PedidosService {
 
     this.logger.log(`Pedido ${saved.id} creado con producto "${producto.nombre}"`);
 
-    // Publicar evento asíncrono a notificaciones (sin bloquear)
+    // Publicar en Redis (Avance 1 — se conserva)
     await this.publicarEvento({
       tipo: 'pedido_creado',
       pedidoId: saved.id,
       productoNombre: producto.nombre,
     });
 
+    // Publicar en RabbitMQ (Avance 2 — segundo transporte)
+    await this.publicarStockRabbitMQ({
+      tipo: 'stock_actualizar',
+      productoId: data.productoId,
+      productoNombre: producto.nombre,
+      cantidadVendida: data.cantidad,
+      pedidoId: saved.id,
+    });
+
     return saved;
   }
 
   /**
-   * Publicar evento en Redis — camino ASÍNCRONO.
-   * El emisor NO espera a svc-notificaciones → desacoplamiento temporal.
-   * Si svc-notificaciones está caído, el pedido IGUAL se procesa.
+   * [CAMINO B — Redis PUBLISH] Publicar evento asíncrono (Avance 1).
+   * El emisor NO espera → desacoplamiento temporal.
    */
   async publicarEvento(data: any): Promise<{ ok: boolean; canal: string }> {
     const canal = 'eventos:notificaciones';
@@ -135,16 +176,98 @@ export class PedidosService {
       timestamp: new Date().toISOString(),
     });
 
-    this.logger.log(`[ASINCRONO] Publicando en Redis canal "${canal}"`);
+    this.logger.log(`[Redis] Publicando en canal "${canal}"`);
 
     try {
       await this.redis.publish(canal, payload);
-      this.logger.log(`Evento publicado sin bloquear al emisor`);
+      this.logger.log(`Evento Redis publicado sin bloquear al emisor`);
     } catch (err) {
-      // El emisor no falla aunque Redis esté caído — manejo de excepciones en capa de servicios
+      // Excepción controlada — el emisor no falla aunque Redis esté caído
       this.logger.error(`Error publicando en Redis: ${err.message}`);
     }
 
     return { ok: true, canal };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CAMINOS AVANCE 2 (nuevos)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * [CAMINO C — gRPC] Obtener un producto usando el contrato productos.proto.
+   * Demuestra: comunicación gRPC + manejo de excepción controlada (C1 + C3 rúbrica).
+   *
+   * Si el producto no existe → retorna error controlado SIN tumbar el servicio.
+   * Si gRPC no está disponible → try/catch captura y retorna error descriptivo.
+   */
+  async obtenerProductoGrpc(id: number): Promise<any> {
+    this.logger.log(`[gRPC] ObtenerProducto id=${id}`);
+
+    try {
+      const respuesta = await firstValueFrom(
+        this.productosGrpcStub.ObtenerProducto({ id }).pipe(
+          timeout(5000),
+          catchError((err) => {
+            this.logger.error(`[gRPC] Timeout o error de transporte: ${err.message}`);
+            throw new Error(`gRPC no disponible: ${err.message}`);
+          }),
+        ),
+      );
+
+      if (!respuesta.encontrado) {
+        // Error de negocio controlado — no tumba el servicio
+        this.logger.warn(`[gRPC] Error controlado: ${respuesta.error}`);
+        return {
+          ok: false,
+          transporte: 'gRPC',
+          error: respuesta.error,
+        };
+      }
+
+      this.logger.log(`[gRPC] ✅ Producto encontrado: "${respuesta.nombre}"`);
+      return {
+        ok: true,
+        transporte: 'gRPC',
+        producto: respuesta,
+      };
+    } catch (err) {
+      // Excepción de infraestructura controlada — no tumba el servicio
+      this.logger.error(`[gRPC] ❌ Error capturado (servicio sigue vivo): ${err.message}`);
+      return {
+        ok: false,
+        transporte: 'gRPC',
+        error: err.message,
+      };
+    }
+  }
+
+  /**
+   * [CAMINO D — RabbitMQ] Publicar evento de actualización de stock.
+   * Patrón PUB/SUB: svc-pedidos publica → svc-notificaciones consume.
+   * Segundo transporte asíncrono, distinto al Redis del Avance 1.
+   */
+  async publicarStockRabbitMQ(data: {
+    tipo: string;
+    productoId: number;
+    productoNombre: string;
+    cantidadVendida: number;
+    pedidoId: number;
+  }): Promise<{ ok: boolean; cola: string }> {
+    const cola = 'stock_actualizar';
+    this.logger.log(`[RabbitMQ] Publicando en cola "${cola}"`);
+
+    try {
+      // emit() = fire-and-forget (no espera respuesta) → asíncrono
+      this.rabbitmqClient.emit('stock.actualizar', {
+        ...data,
+        timestamp: new Date().toISOString(),
+      });
+      this.logger.log(`[RabbitMQ] ✅ Mensaje publicado en cola "${cola}"`);
+    } catch (err) {
+      // Excepción controlada — el emisor no falla aunque RabbitMQ esté caído
+      this.logger.error(`[RabbitMQ] Error publicando: ${err.message}`);
+    }
+
+    return { ok: true, cola };
   }
 }

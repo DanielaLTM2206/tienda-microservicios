@@ -1,12 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { join } from 'path';
 import { PedidosModule } from './pedidos/pedidos.module';
 import { Pedido } from './pedidos/pedido.entity';
 
 /**
- * AppModule de svc-pedidos.
- * Principio DIP: depende de abstracciones (ClientsModule, TypeOrmModule), no de clases concretas.
+ * AppModule de svc-pedidos — Avance 2.
+ * Registra TRES clientes de transporte:
+ *   1. TCP  → svc-productos (Avance 1, se conserva)
+ *   2. gRPC → svc-productos (Avance 2, nuevo)
+ *   3. RMQ  → RabbitMQ (Avance 2, segundo transporte)
+ *
+ * Principio DIP: depende de abstracciones (ClientsModule), no de clases concretas.
  */
 @Module({
   imports: [
@@ -19,9 +25,10 @@ import { Pedido } from './pedidos/pedido.entity';
       password: process.env.DB_PASS ?? 'app',
       database: process.env.DB_NAME ?? 'app',
       entities: [Pedido],
-      synchronize: true, // Solo para desarrollo — en prod usar migraciones
+      synchronize: true,
     }),
-    // Cliente TCP hacia svc-productos (segundo salto de la cadena síncrona)
+
+    // Cliente 1: TCP → svc-productos (Avance 1, se conserva)
     ClientsModule.register([
       {
         name: 'PRODUCTOS_SERVICE',
@@ -32,6 +39,33 @@ import { Pedido } from './pedidos/pedido.entity';
         },
       },
     ]),
+
+    // Cliente 2: gRPC → svc-productos (Avance 2)
+    ClientsModule.register([
+      {
+        name: 'PRODUCTOS_GRPC_SERVICE',
+        transport: Transport.GRPC,
+        options: {
+          package: 'productos',
+          protoPath: join(__dirname, 'proto', 'productos.proto'),
+          url: `${process.env.GRPC_PRODUCTOS_URL ?? 'localhost:5000'}`,
+        },
+      },
+    ]),
+
+    // Cliente 3: RabbitMQ → segundo transporte asíncrono (Avance 2)
+    ClientsModule.register([
+      {
+        name: 'RABBITMQ_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672'],
+          queue: 'stock_actualizar',
+          queueOptions: { durable: true },
+        },
+      },
+    ]),
+
     PedidosModule,
   ],
 })

@@ -1,0 +1,150 @@
+# =============================================================================
+#  docker-compose.transportes.yml  —  Avance 2
+#
+#  Sistema completo con CUATRO transportes:
+#   A. TCP      — Gateway → svc-pedidos → svc-productos   (Avance 1, síncrono)
+#   B. Redis    — svc-pedidos → svc-notificaciones        (Avance 1, asíncrono PUB/SUB)
+#   C. gRPC     — svc-pedidos → svc-productos             (Avance 2, síncrono con contrato)
+#   D. RabbitMQ — svc-pedidos → svc-notificaciones        (Avance 2, asíncrono queue)
+#
+#  Levantar:   docker compose -f docker-compose.transportes.yml up -d --build
+#  Ver logs:   docker compose -f docker-compose.transportes.yml logs -f
+#  Panel RMQ:  http://localhost:15672  (guest / guest)
+# =============================================================================
+
+services:
+
+  # ─── INFRAESTRUCTURA ──────────────────────────────────────────────────────
+
+  db:
+    image: postgres:16-alpine
+    container_name: ms-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Transporte B: Redis PUB/SUB (Avance 1 — se conserva)
+  redis:
+    image: redis:7-alpine
+    container_name: ms-redis
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Transporte D: RabbitMQ — segundo transporte asíncrono (Avance 2)
+  # Panel de administración: http://localhost:15672  (guest/guest)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ms-rabbitmq
+    ports:
+      - "5672:5672"    # AMQP (protocolo de mensajes)
+      - "15672:15672"  # Panel de administración web
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── MICROSERVICIOS ───────────────────────────────────────────────────────
+
+  # MS B — svc-productos: servidor TCP (Avance 1) + servidor gRPC (Avance 2)
+  svc-productos:
+    build:
+      context: .
+      dockerfile: ./apps/productos/Dockerfile
+    container_name: ms-productos
+    environment:
+      TCP_PORT: "3002"
+      GRPC_PORT: "5000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: app
+      DB_PASS: app
+      DB_NAME: app
+    ports:
+      - "5000:5000"    # gRPC expuesto para pruebas con grpcurl
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MS A — svc-pedidos: cliente TCP + cliente gRPC + publicador Redis + publicador RabbitMQ
+  svc-pedidos:
+    build:
+      context: .
+      dockerfile: ./apps/pedidos/Dockerfile
+    container_name: ms-pedidos
+    environment:
+      TCP_PORT: "3001"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: app
+      DB_PASS: app
+      DB_NAME: app
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SVC_PRODUCTOS_HOST: svc-productos
+      SVC_PRODUCTOS_PORT: "3002"
+      GRPC_PRODUCTOS_URL: "svc-productos:5000"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      svc-productos:
+        condition: service_started
+    restart: unless-stopped
+
+  # MS C — svc-notificaciones: suscriptor Redis (Avance 1) + consumidor RabbitMQ (Avance 2)
+  svc-notificaciones:
+    build:
+      context: .
+      dockerfile: ./apps/notificaciones/Dockerfile
+    container_name: ms-notificaciones
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # API Gateway — punto único de entrada HTTP
+  gateway:
+    build:
+      context: .
+      dockerfile: ./apps/gateway/Dockerfile
+    container_name: ms-gateway
+    environment:
+      PORT: "3000"
+      SVC_PEDIDOS_HOST: ms-pedidos
+      SVC_PEDIDOS_PORT: "3001"
+    ports:
+      - "3000:3000"
+    depends_on:
+      svc-pedidos:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:

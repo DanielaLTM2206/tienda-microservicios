@@ -231,9 +231,303 @@ En contraste, el modelo asincrono (Redis PUB/SUB) desacopla en el tiempo: `svc-p
 
 ---
 
-## Avance 2 - Comunicacion: gRPC + 2.o transporte + excepciones - `tag v2-avance2`
+## Avance 2 - Comunicacion: gRPC + RabbitMQ + Excepciones - `tag v2-avance2`
 
-> *Pendiente - Tarea 2*
+### Diagrama - Avance 2 (4 transportes)
+
+```
++-------------------------------------------------------------------+
+|                    CLIENTE (curl / Postman)                        |
++-------------------------------------------------------------------+
+                               | HTTP :3000
+                               v
++-------------------------------------------------------------------+
+|                API GATEWAY (gateway:3000)                          |
+|  Patron: Proxy - enruta sin logica de negocio                     |
+|  AllExceptionsFilter global -> errores HTTP coherentes             |
++----------+----------+--------------------+-----------------------+
+           |          |                    |                       |
+  CAMINO A |          | CAMINO B           | CAMINO C              | CAMINO D
+  TCP sync |          | Redis PUBLISH      | TCP -> gRPC           | TCP -> RabbitMQ
+           v          v                    v                       v
++------------------+  +----------------+  +--------------------+  +------------+
+| svc-pedidos      |  | svc-pedidos    |  | svc-pedidos        |  | svc-pedidos|
+| TCP :3001        |  | TCP :3001      |  | TCP :3001          |  | TCP :3001  |
++--------+---------+  +-------+--------+  +------+-------------+  +-----+------+
+         |                    |                  |                       |
+    TCP  |            Redis   |          gRPC    |             RabbitMQ |
+    2o   |            PUBLISH |          :5000   |             PUBLISH  |
+   salto |                    |                  |             stock_   |
+         v                    v                  v             actualizar
++------------------+  +-------+--------+  +------------------+       |
+| svc-productos    |  |  Redis (canal) |  | svc-productos    |       v
+| TCP :3002        |  +-------+--------+  | gRPC :5000       |  +----+--------+
+| MS B (catalogo)  |          | SUBSCRIBE | MS B (catalogo)  |  | RabbitMQ   |
++------------------+          v           +------------------+  +-----+-------+
+                     +--------+---------+                             | CONSUME
+                     | svc-notificaciones|                            v
+                     | MS C - consumidor |              +-------------+-------+
+                     | Redis PUB/SUB     |              | svc-notificaciones  |
+                     +-------------------+              | RabbitMQ consumer   |
+                                                        +--------------------+
+
+Infraestructura Avance 2:
+  PostgreSQL <- svc-pedidos, svc-productos
+  Redis      <- svc-pedidos (PUBLISH), svc-notificaciones (SUBSCRIBE) [Avance 1]
+  RabbitMQ   <- svc-pedidos (PUBLISH), svc-notificaciones (CONSUME)  [Avance 2]
+  gRPC       <- svc-pedidos (cliente), svc-productos (servidor)      [Avance 2]
+```
+
+---
+
+### Contrato gRPC — `apps/proto/productos.proto`
+
+El contrato es el archivo central del patron Contract-First. Vive en una carpeta compartida
+del monorepo (`apps/proto/`) y es referenciado por ambos servicios en tiempo de build.
+
+```proto
+syntax = "proto3";
+package productos;
+
+service ProductosService {
+  rpc ObtenerProducto (ProductoRequest) returns (ProductoResponse);
+  rpc ListarProductos  (ListarRequest)   returns (ListarResponse);
+}
+
+message ProductoRequest  { int32 id = 1; }
+
+message ProductoResponse {
+  int32  id         = 1;
+  string nombre     = 2;
+  double precio     = 3;
+  bool   disponible = 4;
+  bool   encontrado = 5;  // false = error controlado (producto no existe)
+  string error      = 6;  // descripcion del error si encontrado=false
+}
+
+message ListarRequest {}
+message ListarResponse { repeated ProductoResponse productos = 1; }
+```
+
+**Como funciona la comunicacion gRPC:**
+
+1. `svc-productos` levanta un servidor gRPC en el puerto `5000` junto con su servidor TCP `3002`.
+   NestJS soporta multiples transportes con `app.connectMicroservice()`.
+2. `svc-pedidos` crea un stub gRPC en `onModuleInit()` usando `ClientGrpc.getService()`.
+3. Cuando el Gateway llama `GET /api/pedidos/producto/:id/grpc`, la cadena es:
+   `Gateway (HTTP) → svc-pedidos (TCP) → svc-productos (gRPC)`.
+4. Si el producto no existe, `svc-productos` retorna `encontrado=false` con un mensaje de error.
+   El servicio **no cae** — es un error controlado con try/catch en la capa de servicios.
+
+**Rutas de prueba gRPC:**
+```bash
+# Producto existente -> respuesta exitosa con datos del producto
+curl http://localhost:3000/api/pedidos/producto/1/grpc
+
+# Producto inexistente -> error CONTROLADO (200 OK con ok:false, servicio sigue vivo)
+curl http://localhost:3000/api/pedidos/producto/999/grpc
+```
+
+---
+
+### Segundo Transporte — RabbitMQ (cola `stock_actualizar`)
+
+**Por que RabbitMQ y no Redis para este flujo:**
+Redis PUB/SUB es volatile — si el consumidor esta caido en el momento del PUBLISH,
+el mensaje se pierde. RabbitMQ usa colas durables: el mensaje persiste hasta que
+el consumidor lo procesa, lo que garantiza entrega incluso con reinicios del servicio.
+
+**Flujo PUB/SUB con RabbitMQ:**
+
+```
+POST /api/pedidos
+    └─► svc-pedidos.create()
+         ├─► [TCP]      svc-productos: verificar producto existe
+         ├─► BD local:  guardar pedido
+         ├─► [Redis]    PUBLISH eventos:notificaciones (Avance 1 - se conserva)
+         └─► [RabbitMQ] emit('stock.actualizar', payload)
+                              └─► cola: stock_actualizar (durable)
+                                   └─► svc-notificaciones.handleStockActualizar()
+                                        └─► procesarStockUpdate(): log de actualizacion
+```
+
+**Probar el flujo RabbitMQ:**
+```bash
+# 1. Crear un pedido (dispara automaticamente Redis + RabbitMQ)
+curl -X POST http://localhost:3000/api/pedidos \
+  -H "Content-Type: application/json" \
+  -d '{"productoId": 1, "cantidad": 3}'
+
+# 2. Publicar en RabbitMQ manualmente (para prueba aislada)
+curl -X POST http://localhost:3000/api/pedidos/stock \
+  -H "Content-Type: application/json" \
+  -d '{"productoId":2,"productoNombre":"Mouse","cantidadVendida":5,"pedidoId":99}'
+
+# 3. Ver panel de administracion RabbitMQ
+open http://localhost:15672  # usuario: guest / password: guest
+```
+
+**Evidencia en logs de svc-notificaciones:**
+```
+🐇 [RabbitMQ] Evento recibido: stock.actualizar
+🐇 [RabbitMQ] Procesando stock.actualizar:
+   Producto: #1 "Laptop Pro"
+   Cantidad vendida: 3
+   Pedido relacionado: #7
+   Timestamp: 2026-07-18T01:30:00.000Z
+✅ [RabbitMQ] Stock del producto "Laptop Pro" actualizado: -3 unidades
+```
+
+---
+
+### Manejo de Excepciones
+
+**Estrategia consistente en todos los caminos (C3 rubrica — nivel 5):**
+
+| Capa | Mecanismo | Efecto |
+|---|---|---|
+| Gateway (HTTP) | `AllExceptionsFilter` global | Convierte cualquier error en HTTP coherente (4xx/5xx) |
+| svc-pedidos (TCP) | `AllRpcExceptionsFilter` global | Errores en handlers TCP retornan objeto estructurado, no tumban |
+| svc-pedidos (Service) | `try/catch` en cada metodo | Errores de infraestructura (Redis/RabbitMQ caidos) no fallan el flujo principal |
+| svc-productos (gRPC) | `try/catch` en `@GrpcMethod` | Retorna `encontrado=false` en lugar de lanzar excepcion gRPC |
+| svc-notificaciones (RabbitMQ) | `try/catch` en `@EventPattern` | Mensaje malformado no tumba el consumidor |
+
+**Demo de error controlado — producto inexistente por gRPC:**
+```bash
+# Llamar con id=999 (no existe en la BD)
+curl http://localhost:3000/api/pedidos/producto/999/grpc
+
+# Respuesta esperada (200 OK - el servicio NO cae):
+{
+  "ok": false,
+  "transporte": "gRPC",
+  "error": "Producto con id=999 no existe en el catalogo"
+}
+
+# Log en svc-productos:
+⚠️  [gRPC] Producto id=999 no encontrado (error controlado)
+
+# Log en svc-pedidos:
+[gRPC] ⚠️  Error controlado: Producto con id=999 no existe en el catalogo
+```
+
+---
+
+### Como ejecutar el sistema completo (Avance 2)
+
+```bash
+# Levantar con el docker-compose del Avance 2
+docker compose -f docker-compose.transportes.yml up -d --build
+
+# Verificar que todos los servicios estan corriendo
+docker compose -f docker-compose.transportes.yml ps
+
+# Ver logs en tiempo real
+docker compose -f docker-compose.transportes.yml logs -f svc-notificaciones
+```
+
+**Rutas disponibles Avance 2:**
+
+| Metodo | Ruta | Transporte | Descripcion |
+|---|---|---|---|
+| GET | `/api/health` | HTTP directo | Health check del gateway |
+| GET | `/api/pedidos` | TCP x2 | Lista pedidos + info de productos |
+| POST | `/api/pedidos` | TCP x2 + Redis + RabbitMQ | Crear pedido (dispara 4 transportes) |
+| POST | `/api/pedidos/notificar` | TCP + Redis | Publicar evento Redis manual |
+| GET | `/api/pedidos/producto/:id/grpc` | TCP + gRPC | **[NUEVO]** Consultar producto por gRPC |
+| POST | `/api/pedidos/stock` | TCP + RabbitMQ | **[NUEVO]** Publicar en RabbitMQ manual |
+
+---
+
+### Tabla comparativa de transportes
+
+| Transporte | Tipo | Patron | Garantia de entrega | Cuando lo usamos |
+|---|---|---|---|---|
+| **TCP** | Sincrono | Peticion-respuesta | Alta (bloquea hasta respuesta) | Cadena Gateway → svc-pedidos → svc-productos |
+| **Redis PUB/SUB** | Asincrono | Publicar/Suscribir | Sin garantia (volatile) | Notificaciones de pedido creado (Avance 1) |
+| **RabbitMQ** | Asincrono | Cola de mensajes | Alta (cola durable, persiste) | Actualizacion de stock — no se puede perder (Avance 2) |
+| **gRPC** | Sincrono | Contrato RPC | Alta (bloquea, con timeout) | Cuando se necesita contrato tipado entre servicios (Avance 2) |
+
+**Cuando conviene cada transporte segun lo observado:**
+- **TCP NestJS:** ideal como transporte base dentro del mismo ecosistema NestJS. Simple y rapido, pero sin contrato formal.
+- **Redis PUB/SUB:** cuando la velocidad es critica y se puede tolerar perder eventos si el consumidor esta caido (notificaciones opcionales, logs).
+- **RabbitMQ:** cuando la entrega DEBE garantizarse aunque el consumidor este temporalmente caido (actualizaciones criticas de stock, facturacion, etc.). La cola durable persiste los mensajes.
+- **gRPC:** cuando se necesita un contrato fuerte entre servicios (el `.proto` define exactamente los tipos), comunicacion eficiente en binario (Protocol Buffers), y es posible que el servicio destino cambie de equipo o lenguaje.
+
+---
+
+### Patrones y principios SOLID nuevos en Avance 2
+
+| Patron / Principio | Donde se aplica | Descripcion |
+|---|---|---|
+| **Contract-First (gRPC)** | `apps/proto/productos.proto` | El contrato define la interfaz ANTES de implementar |
+| **Hybrid Application** | `svc-productos/main.ts` | Un servicio con multiples transportes (TCP + gRPC) simultaneos |
+| **AllRpcExceptionsFilter** | `svc-pedidos/filters/` | Estrategia centralizada de errores para handlers TCP |
+| **OCP** (Open/Closed) | `notificaciones.service.ts` | Se agrego `procesarStockUpdate` sin modificar el codigo Redis existente |
+| **ISP** (Interface Segregation) | `ProductosGrpcService` interface | La interfaz del stub gRPC declara solo los metodos que pedidos necesita |
+
+---
+
+### Evidencias de Funcionamiento (Pruebas)
+
+A continuación se detallan las respuestas y logs reales obtenidos al ejecutar las pruebas en el entorno de desarrollo:
+
+#### 1. Evidencia de gRPC Funcionando (Caso Exitoso)
+Petición HTTP al Gateway que dispara una consulta interna síncrona gRPC a `svc-productos`:
+```bash
+curl http://localhost:3000/api/pedidos/producto/1/grpc
+```
+**Respuesta JSON obtenida (200 OK):**
+```json
+{
+  "ok": true,
+  "transporte": "gRPC",
+  "producto": {
+    "id": 1,
+    "nombre": "Laptop Pro",
+    "precio": 1299.99,
+    "disponible": true,
+    "encontrado": true,
+    "error": ""
+  }
+}
+```
+
+#### 2. Evidencia de Manejo de Excepciones gRPC (Caso Controlado sin Caída)
+Petición de un producto que no existe en el catálogo para demostrar que no se cae el servicio:
+```bash
+curl http://localhost:3000/api/pedidos/producto/999/grpc
+```
+**Respuesta JSON obtenida (200 OK - Controlado):**
+```json
+{
+  "ok": false,
+  "transporte": "gRPC",
+  "error": "Producto con id=999 no existe en el catalogo"
+}
+```
+**Log en `svc-productos` (ms-productos):**
+```text
+⚠️  [gRPC] Producto id=999 no encontrado (error controlado)
+```
+
+#### 3. Evidencia del Segundo Transporte RabbitMQ (Mensaje Publicado y Consumido)
+Petición POST para simular actualización de stock asíncrona:
+```bash
+curl -X POST http://localhost:3000/api/pedidos/stock \
+  -H "Content-Type: application/json" \
+  -d '{"productoId":2,"productoNombre":"Mouse Inalambrico","cantidadVendida":5,"pedidoId":101}'
+```
+**Logs de consumo en `svc-notificaciones` (ms-notificaciones):**
+```text
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesController] 🐇 [RabbitMQ] Evento recibido: stock.actualizar
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesService] 🐇 [RabbitMQ] Procesando stock.actualizar:
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesService]    Producto: #2 "Mouse Inalambrico"
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesService]    Cantidad vendida: 5
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesService]    Pedido relacionado: #101
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesService]    Timestamp: 2026-07-18T03:47:00.044Z
+ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesService] ✅ [RabbitMQ] Stock del producto "Mouse Inalambrico" actualizado: -5 unidades
+```
 
 ---
 
@@ -245,4 +539,4 @@ En contraste, el modelo asincrono (Redis PUB/SUB) desacopla en el tiempo: `svc-p
 
 ## Tags de entrega
 
-- `v1-avance1` - *por publicar* - `v2-avance2` - *pendiente* - `v3-final` - *pendiente*
+- `v1-avance1` - Avance 1 completado - `v2-avance2` - Avance 2 completado - `v3-final` - *pendiente*

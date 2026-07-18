@@ -1,0 +1,42 @@
+// productos.proto — Contrato gRPC del sistema ShopMS
+// Usado por: svc-pedidos (cliente) <-> svc-productos (servidor)
+// Monorepo: apps/proto/productos.proto
+//
+// Patrón: Contract-First (el contrato define la interfaz antes de implementar)
+// Principio ISP: la interfaz expone solo lo necesario para la comunicación.
+
+syntax = "proto3";
+
+package productos;
+
+// Servicio gRPC que expone operaciones de productos
+service ProductosService {
+  // Obtener un producto por ID (petición-respuesta síncrona)
+  rpc ObtenerProducto (ProductoRequest) returns (ProductoResponse);
+
+  // Obtener todos los productos
+  rpc ListarProductos (ListarRequest) returns (ListarResponse);
+}
+
+// Mensaje de solicitud: identificador del producto
+message ProductoRequest {
+  int32 id = 1;
+}
+
+// Mensaje de respuesta: datos del producto
+message ProductoResponse {
+  int32    id         = 1;
+  string   nombre     = 2;
+  double   precio     = 3;
+  bool     disponible = 4;
+  bool     encontrado = 5; // false si el producto no existe (error controlado)
+  string   error      = 6; // descripción del error si encontrado=false
+}
+
+// Mensaje vacío para listar todos los productos
+message ListarRequest {}
+
+// Lista de productos
+message ListarResponse {
+  repeated ProductoResponse productos = 1;
+}

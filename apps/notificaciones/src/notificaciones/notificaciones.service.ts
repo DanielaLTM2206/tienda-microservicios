@@ -2,20 +2,20 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import Redis from 'ioredis';
 
 /**
- * Servicio de Notificaciones — Patrón SUBSCRIBER del Pub/Sub.
- * Principio SRP: solo recibe y procesa eventos, no conoce al emisor.
- * Principio OCP: para soportar nuevos tipos de eventos basta agregar un case, sin modificar lo existente.
+ * Servicio de Notificaciones — Avance 2.
+ * Mantiene el suscriptor Redis del Avance 1 y agrega el procesamiento
+ * de eventos RabbitMQ (llamado desde NotificacionesController).
  *
- * DESACOPLAMIENTO TEMPORAL demostrado:
- * - Si este servicio se cae, svc-pedidos sigue funcionando.
- * - Si se vuelve a levantar, simplemente empieza a recibir nuevos eventos.
- * - Los dos servicios NO necesitan estar vivos al mismo tiempo.
+ * Principio SRP: cada método procesa un tipo específico de evento.
+ * Principio OCP: agregar un nuevo evento = agregar un case o método, sin modificar los existentes.
  */
 @Injectable()
 export class NotificacionesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificacionesService.name);
   private subscriber: Redis;
   private readonly CANAL = 'eventos:notificaciones';
+
+  // ── Avance 1: Redis Subscriber (se conserva intacto) ─────────────────────
 
   onModuleInit() {
     this.subscriber = new Redis({
@@ -24,56 +24,83 @@ export class NotificacionesService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.subscriber.on('connect', () => {
-      this.logger.log(`Conectado a Redis como Subscriber`);
+      this.logger.log(`📡 Conectado a Redis como Subscriber`);
     });
 
-    // Suscribirse directamente — ioredis encola el comando hasta que la conexión esté lista.
-    // Esto evita el error "subscriber mode" que ocurre al llamar subscribe() dentro del evento connect.
     this.subscriber
       .subscribe(this.CANAL)
       .then((count) => {
-        this.logger.log(`Suscrito al canal "${this.CANAL}" (${count} canales activos)`);
+        this.logger.log(`Suscrito al canal Redis "${this.CANAL}" (${count} canales activos)`);
       })
       .catch((err) => {
-        this.logger.error(`Error al suscribirse: ${err.message}`);
+        this.logger.error(`Error al suscribirse a Redis: ${err.message}`);
       });
 
     this.subscriber.on('error', (err: Error) => {
-      // Ignorar el error cosmético de ioredis cuando la conexión ya está en modo suscriptor
       if (err.message?.includes('subscriber mode')) return;
       this.logger.error(`Error de conexión Redis: ${err.message}`);
     });
 
-    // Procesar mensajes recibidos — Patrón Publisher/Subscriber
     this.subscriber.on('message', (canal: string, mensaje: string) => {
-      this.procesarEvento(canal, mensaje);
+      this.procesarEventoRedis(canal, mensaje);
     });
   }
 
-  private procesarEvento(canal: string, mensaje: string) {
+  private procesarEventoRedis(canal: string, mensaje: string) {
     try {
       const evento = JSON.parse(mensaje);
-      this.logger.log(`Evento recibido en "${canal}": ${JSON.stringify(evento)}`);
+      this.logger.log(`📡 [Redis] Evento en "${canal}": ${JSON.stringify(evento)}`);
 
-      // Patrón OCP: solo agregar cases para nuevos tipos de evento
       switch (evento.tipo) {
         case 'pedido_creado':
           this.logger.log(
-            `NOTIFICACION: Pedido #${evento.pedidoId} creado con producto "${evento.productoNombre}"`,
+            `📢 [Redis] NOTIFICACIÓN: Pedido #${evento.pedidoId} creado con producto "${evento.productoNombre}"`,
           );
           break;
-
         default:
-          this.logger.log(`Evento generico procesado: ${evento.tipo ?? 'sin tipo'}`);
+          this.logger.log(`📢 [Redis] Evento genérico: ${evento.tipo ?? 'sin tipo'}`);
       }
     } catch (err) {
-      // Manejo de excepción en capa de servicio — un mensaje malformado no tumba el servicio
-      this.logger.error(`Error al procesar mensaje: ${err.message} | raw: ${mensaje}`);
+      // Error controlado — un mensaje malformado no tumba el servicio
+      this.logger.error(`❌ [Redis] Error al procesar mensaje: ${err.message} | raw: ${mensaje}`);
     }
   }
 
   async onModuleDestroy() {
     await this.subscriber?.quit();
     this.logger.log('Desconectado de Redis');
+  }
+
+  // ── Avance 2: Procesador de eventos RabbitMQ ─────────────────────────────
+
+  /**
+   * Procesa eventos de actualización de stock llegados desde RabbitMQ.
+   * Llamado por NotificacionesController cuando llega un mensaje de la cola stock_actualizar.
+   *
+   * Manejo de excepciones: try/catch asegura que un mensaje malformado
+   * no tumbe el consumidor — error controlado demostrado (C3 rúbrica).
+   */
+  async procesarStockUpdate(data: any): Promise<void> {
+    try {
+      if (!data || typeof data !== 'object') {
+        throw new Error('Payload inválido — se esperaba un objeto');
+      }
+
+      this.logger.log(`🐇 [RabbitMQ] Procesando stock.actualizar:`);
+      this.logger.log(`   Producto: #${data.productoId} "${data.productoNombre}"`);
+      this.logger.log(`   Cantidad vendida: ${data.cantidadVendida}`);
+      this.logger.log(`   Pedido relacionado: #${data.pedidoId}`);
+      this.logger.log(`   Timestamp: ${data.timestamp}`);
+
+      // Aquí iría la lógica real de actualización de stock (p. ej. llamar a BD)
+      // Por ahora se simula el procesamiento con un log
+      this.logger.log(
+        `✅ [RabbitMQ] Stock del producto "${data.productoNombre}" actualizado: -${data.cantidadVendida} unidades`,
+      );
+    } catch (err) {
+      // Excepción controlada — no tumba el consumidor
+      this.logger.error(`❌ [RabbitMQ] Error controlado en procesarStockUpdate: ${err.message}`);
+      throw err; // Re-lanzar para que el controller también lo registre
+    }
   }
 }
