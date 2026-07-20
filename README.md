@@ -7,8 +7,8 @@
 | Integrante | Rol | GitHub |
 |---|---|---|
 | Daniela Tituaña | Backend / Arquitectura | @DanielaLTM2206 |
-| Stiven Molina | Transportes / Comunicacion | @stiven-molina |
-| Jeffrey Manobanda | Documentacion / QA | @jeffrey-manobanda |
+| Stiven Molina | Transportes / Comunicacion | @gsMolina02 |
+| Jeffrey Manobanda | Documentacion / QA | @jeffrey2206 |
 
 ---
 
@@ -53,6 +53,7 @@ curl http://localhost:3000/api/pedidos
 | Metodo | Ruta | Flujo | Descripcion |
 |---|---|---|---|
 | GET | `/api/health` | Directo | Health check del gateway |
+| GET | `/api/pedidos/ping` | Sincrono TCP x1 | Un solo salto (gateway -> pedidos), para medir latencia por salto |
 | GET | `/api/pedidos` | Sincrono TCP x2 | Lista pedidos + info de productos |
 | POST | `/api/pedidos` | Sincrono TCP x2 | Crear pedido (body: `{"productoId": 1, "cantidad": 2}`) |
 | POST | `/api/pedidos/notificar` | Asincrono Redis | Publicar evento (body: `{"mensaje": "hola"}`) |
@@ -99,7 +100,8 @@ curl http://localhost:3000/api/pedidos
                                   +----------------------------+
 
 Infraestructura compartida:
-  PostgreSQL <- svc-pedidos, svc-productos (cada uno su propio schema/tabla)
+  PostgreSQL <- svc-pedidos (BD pedidos_db), svc-productos (BD productos_db)
+               (una base de datos por microservicio - ver scripts/init-db.sql)
   Redis      <- svc-pedidos (PUBLISH), svc-notificaciones (SUBSCRIBE)
 ```
 
@@ -107,32 +109,25 @@ Infraestructura compartida:
 
 ## Metodologia
 
-- **Kanban:** [GitHub Projects - ShopMS Board](https://github.com/users/DanielaLTM2206/projects/1/views/1)
+- **Kanban:** [GitHub Projects - ShopMS Board](https://github.com/users/DanielaLTM2206/projects/1/views/1) *(board en proceso de hacerse publico; cada tarjeta se vincula a su issue/PR)*
   
   ![Tablero Kanban](docs/kanban-avance1.png)
   
-- **Ramificacion:** GitHub Flow - main protegida, ramas `feat/...`, `fix/...`, `docs/...`, PRs revisados por otro integrante, tags por avance.
 - **Commits semanticos:** Conventional Commits.
+- **Tags por avance:** `v1-avance1`, `v2-avance2`, `v3-final`.
 
-**Ejemplos de commits:**
-```
-feat(gateway): agregar rutas HTTP y cliente TCP hacia svc-pedidos
-feat(pedidos): implementar cadena sincrona TCP con svc-productos
-feat(notificaciones): suscribir a canal Redis eventos:notificaciones
-fix(pedidos): controlar timeout de svc-productos con catchError
-docs(readme): agregar diagrama de arquitectura avance 1
-chore(docker): configurar health checks en docker-compose
-```
+**Transparencia sobre el proceso (Avances 1 y 2):** el codigo de los dos primeros
+avances se subio a `main` en commits unicos y grandes; las ramas `feat/...` y
+`docs/...` se crearon pero no recibieron commits propios ni hubo PRs mergeados.
+La version anterior de esta seccion describia un GitHub Flow con PRs revisados
+que en realidad no ocurrio; se corrige aqui para que la documentacion refleje
+el historial real del repositorio.
 
-**Estrategia de ramificacion:**
-```
-main <- feat/gateway-setup (PR)
-     <- feat/ms-pedidos     (PR)
-     <- feat/ms-productos   (PR)
-     <- feat/ms-notificaciones (PR)
-     <- docs/readme-avance1  (PR)
-     <- tag v1-avance1
-```
+**Flujo de trabajo adoptado a partir de la retroalimentacion (en adelante):**
+- Una rama por tarea (`feat/...`, `fix/...`, `docs/...`) con commits incrementales y pequenos.
+- PRs reales mergeados a `main`, revisados por un integrante distinto al autor.
+- Commits de los tres integrantes, cada uno con su propia identidad de Git.
+- Tarjetas del Kanban vinculadas a su issue/PR correspondiente.
 
 ---
 
@@ -162,10 +157,31 @@ main <- feat/gateway-setup (PR)
 
 ### Latencia medida con `benchmark.js`
 
+Medicion original del Avance 1 (respaldada por las capturas de abajo):
+
 | Camino | Promedio (ms) | p95 (ms) | Max (ms) |
 |---|---|---|---|
 | Sincrono (TCP x2) | 3.98 | 5.00 | 184.00 |
 | Asincrono (Redis PUBLISH) | 2.21 | 3.00 | 57.00 |
+
+**Descomposicion por salto** (re-medicion del 2026-07-20, mismo run, 200 peticiones por camino, 0 errores):
+
+| Camino | Promedio (ms) | p95 (ms) | Max (ms) |
+|---|---|---|---|
+| Sincrono 1 salto (`/api/pedidos/ping`, TCP x1, sin BD) | 2.71 | 3.00 | 120.00 |
+| Sincrono 2 saltos (`/api/pedidos`, TCP x2 + BD) | 4.86 | 6.00 | 83.00 |
+| Asincrono (`/api/pedidos/notificar`, TCP x1 + Redis PUBLISH) | 3.12 | 4.00 | 62.00 |
+
+La resta entre los dos caminos sincronos **mide** (ya no solo afirma) lo que agrega
+el segundo salto: `4.86 − 2.71 ≈ 2.15 ms` por el salto TCP extra mas la consulta a BD.
+Cada salto adicional en una cadena sincrona suma su propia latencia y no puede
+empezar hasta que termina el anterior.
+
+> Nota de honestidad metodologica: el endpoint "asincrono" tambien atraviesa un
+> salto TCP sincrono (gateway -> svc-pedidos) antes de publicar en Redis, asi que
+> su latencia no es de publicacion pura. Comparado contra el camino de 1 salto
+> (2.71 ms), el PUBLISH a Redis agrega apenas ~0.4 ms porque el emisor no espera
+> al consumidor.
 
 **Capturas de los benchmarks de latencia:**
 * Sincrono (TCP):
@@ -177,7 +193,10 @@ main <- feat/gateway-setup (PR)
 
 **Como reproducir:**
 ```bash
-# Sincrono (GET /api/pedidos - 2 saltos TCP)
+# Sincrono 1 salto (GET /api/pedidos/ping - solo gateway -> svc-pedidos)
+node tarea-1/benchmark.js http://localhost:3000/api/pedidos/ping 200
+
+# Sincrono 2 saltos (GET /api/pedidos - gateway -> pedidos -> productos + BD)
 node tarea-1/benchmark.js http://localhost:3000/api/pedidos 200
 
 # Asincrono (POST /api/pedidos/notificar - publica en Redis)
@@ -222,7 +241,7 @@ curl -X POST http://localhost:3000/api/pedidos/notificar \
 ### Analisis
 
 **Acumulacion de latencia (camino sincrono):**  
-En una cadena sincrona Gateway -> A -> B, el tiempo total de respuesta es la suma de las latencias de cada salto: `t_total ≈ t_gateway + t_pedidos + t_productos`. Cada servicio debe esperar que el anterior responda antes de continuar. Si cada salto demora ~10 ms, la cadena acumula ~30 ms solo en transporte, sin contar el tiempo de BD.
+En una cadena sincrona Gateway -> A -> B, el tiempo total de respuesta es la suma de las latencias de cada salto: `t_total ≈ t_gateway + t_pedidos + t_productos`. Cada servicio debe esperar que el anterior responda antes de continuar. La forma de *medirlo* (y no solo afirmarlo) es descomponer por salto: `GET /api/pedidos/ping` recorre un solo salto TCP (2.71 ms en promedio), mientras que `GET /api/pedidos` recorre dos saltos mas la consulta a BD (4.86 ms). La resta, ≈ 2.15 ms, es el costo real que agrega el segundo salto en la red local de Docker. El punto arquitectonico es que ese costo crece linealmente con cada salto que se agregue a la cadena — y ningun salto puede empezar hasta que termine el anterior.
 
 **Acoplamiento temporal:**  
 El modelo sincrono exige que todos los servicios de la cadena esten vivos al mismo tiempo. Al apagar `svc-productos`, la peticion a `GET /api/pedidos` falla completamente con un error 503, aunque `svc-pedidos` y el Gateway esten funcionando perfectamente. Esto es el acoplamiento temporal: si uno falla, falla toda la cadena.
@@ -280,10 +299,12 @@ Infraestructura Avance 2:
 
 ---
 
-### Contrato gRPC — `apps/proto/productos.proto`
+### Contrato gRPC — `libs/proto/productos.proto`
 
 El contrato es el archivo central del patron Contract-First. Vive en una carpeta compartida
-del monorepo (`apps/proto/`) y es referenciado por ambos servicios en tiempo de build.
+en la raiz del monorepo (`libs/proto/`) y es referenciado por ambos servicios en tiempo de
+build (los Dockerfiles lo copian al `dist/proto` de cada imagen), de modo que existe UNA
+sola fuente del contrato y no puede divergir entre servicios.
 
 ```proto
 syntax = "proto3";
@@ -386,8 +407,9 @@ open http://localhost:15672  # usuario: guest / password: guest
 
 | Capa | Mecanismo | Efecto |
 |---|---|---|
-| Gateway (HTTP) | `AllExceptionsFilter` global | Convierte cualquier error en HTTP coherente (4xx/5xx) |
-| svc-pedidos (TCP) | `AllRpcExceptionsFilter` global | Errores en handlers TCP retornan objeto estructurado, no tumban |
+| Gateway (HTTP) | `AllExceptionsFilter` global | Convierte cualquier error en HTTP coherente (4xx/5xx) preservando el mensaje y origen del error remoto |
+| svc-pedidos (TCP) | `RpcException` + `AllRpcExceptionsFilter` global | Errores cruzan TCP como objeto estructurado `{statusCode, message, origen}`, sin perder identidad |
+| svc-productos (TCP) | `RpcException` + `AllRpcExceptionsFilter` global | El servicio que falla se identifica a si mismo (`origen: svc-productos`) en vez de que el gateway adivine |
 | svc-pedidos (Service) | `try/catch` en cada metodo | Errores de infraestructura (Redis/RabbitMQ caidos) no fallan el flujo principal |
 | svc-productos (gRPC) | `try/catch` en `@GrpcMethod` | Retorna `encontrado=false` en lugar de lanzar excepcion gRPC |
 | svc-notificaciones (RabbitMQ) | `try/catch` en `@EventPattern` | Mensaje malformado no tumba el consumidor |
@@ -431,6 +453,7 @@ docker compose -f docker-compose.transportes.yml logs -f svc-notificaciones
 | Metodo | Ruta | Transporte | Descripcion |
 |---|---|---|---|
 | GET | `/api/health` | HTTP directo | Health check del gateway |
+| GET | `/api/pedidos/ping` | TCP x1 | Un salto, para descomponer la latencia por salto |
 | GET | `/api/pedidos` | TCP x2 | Lista pedidos + info de productos |
 | POST | `/api/pedidos` | TCP x2 + Redis + RabbitMQ | Crear pedido (dispara 4 transportes) |
 | POST | `/api/pedidos/notificar` | TCP + Redis | Publicar evento Redis manual |
@@ -460,7 +483,7 @@ docker compose -f docker-compose.transportes.yml logs -f svc-notificaciones
 
 | Patron / Principio | Donde se aplica | Descripcion |
 |---|---|---|
-| **Contract-First (gRPC)** | `apps/proto/productos.proto` | El contrato define la interfaz ANTES de implementar |
+| **Contract-First (gRPC)** | `libs/proto/productos.proto` | El contrato define la interfaz ANTES de implementar |
 | **Hybrid Application** | `svc-productos/main.ts` | Un servicio con multiples transportes (TCP + gRPC) simultaneos |
 | **AllRpcExceptionsFilter** | `svc-pedidos/filters/` | Estrategia centralizada de errores para handlers TCP |
 | **OCP** (Open/Closed) | `notificaciones.service.ts` | Se agrego `procesarStockUpdate` sin modificar el codigo Redis existente |

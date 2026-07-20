@@ -1,18 +1,27 @@
+# Contexto de build: la RAIZ del monorepo (ver docker-compose*.yml)
 FROM node:22-alpine AS builder
-WORKDIR /app
-COPY ./apps/pedidos/package.json ./
-RUN npm install
-COPY ./apps/pedidos/tsconfig.json ./
-COPY ./apps/pedidos/src/ ./src/
-# Copiar el contrato proto compartido desde la raíz del monorepo
-COPY ./apps/proto/ ./proto/
-RUN npm run build
-# Copiar el proto al directorio dist para que sea accesible en runtime
-RUN mkdir -p dist/proto && cp -r proto/* dist/proto/
+WORKDIR /repo
+
+# Manifiestos del workspace: npm ci instala EXACTAMENTE lo del package-lock.json
+# (build reproducible; npm ci falla si lock y package.json divergen)
+COPY package.json package-lock.json ./
+COPY apps/gateway/package.json apps/gateway/
+COPY apps/pedidos/package.json apps/pedidos/
+COPY apps/productos/package.json apps/productos/
+COPY apps/notificaciones/package.json apps/notificaciones/
+RUN npm ci
+
+COPY apps/pedidos/tsconfig.json apps/pedidos/
+COPY apps/pedidos/src apps/pedidos/src
+# Contrato proto compartido del monorepo
+COPY libs/proto libs/proto
+RUN npm run build -w pedidos
+# El proto debe estar junto al dist para cargarse en runtime
+RUN mkdir -p apps/pedidos/dist/proto && cp libs/proto/* apps/pedidos/dist/proto/
 
 FROM node:22-alpine
 WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY ./apps/pedidos/package.json ./
+COPY --from=builder /repo/node_modules ./node_modules
+COPY --from=builder /repo/apps/pedidos/dist ./dist
+COPY apps/pedidos/package.json ./
 CMD ["node", "dist/main"]

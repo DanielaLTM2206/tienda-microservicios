@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ClientProxy, ClientGrpc } from '@nestjs/microservices';
+import { ClientProxy, ClientGrpc, RpcException } from '@nestjs/microservices';
 import { firstValueFrom, timeout, catchError, Observable } from 'rxjs';
 import Redis from 'ioredis';
 import { Pedido } from './pedido.entity';
@@ -74,6 +74,38 @@ export class PedidosService implements OnModuleInit {
     this.logger.log('Stub gRPC de ProductosService inicializado');
   }
 
+  /**
+   * Normaliza el error recibido de svc-productos conservando su identidad:
+   * - TimeoutError → svc-productos no responde (503, acoplamiento temporal)
+   * - error estructurado del filtro de svc-productos → se reenvía tal cual
+   * - cualquier otro → 502 con el detalle disponible
+   */
+  private errorProductos(err: any): {
+    statusCode: number;
+    message: string;
+    origen: string;
+  } {
+    if (err?.name === 'TimeoutError') {
+      return {
+        statusCode: 503,
+        message: 'svc-productos no responde (timeout) - acoplamiento temporal',
+        origen: 'svc-productos',
+      };
+    }
+    if (err?.message) {
+      return {
+        statusCode: typeof err.statusCode === 'number' ? err.statusCode : 502,
+        message: err.message,
+        origen: err.origen ?? 'svc-productos',
+      };
+    }
+    return {
+      statusCode: 502,
+      message: 'Error desconocido al contactar svc-productos',
+      origen: 'svc-productos',
+    };
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // CAMINOS AVANCE 1 (se conservan intactos)
   // ─────────────────────────────────────────────────────────────────────────────
@@ -86,22 +118,19 @@ export class PedidosService implements OnModuleInit {
 
     const pedidos = await this.pedidoRepo.find();
 
-    let productos: any[] = [];
-    try {
-      productos = await firstValueFrom(
-        this.productosTcpClient
-          .send({ cmd: 'get_productos' }, {})
-          .pipe(
-            timeout(4000),
-            catchError((err) => {
-              this.logger.error(`svc-productos TCP no responde: ${err.message}`);
-              throw new Error('svc-productos no disponible (acoplamiento temporal)');
-            }),
-          ),
-      );
-    } catch (err) {
-      throw err;
-    }
+    const productos: any[] = await firstValueFrom(
+      this.productosTcpClient
+        .send({ cmd: 'get_productos' }, {})
+        .pipe(
+          timeout(4000),
+          catchError((err) => {
+            this.logger.error(`Error consultando svc-productos: ${err?.message}`);
+            // Propagar el error SIN perder identidad: si svc-productos ya
+            // envió un error estructurado, se reenvía tal cual
+            throw new RpcException(this.errorProductos(err));
+          }),
+        ),
+    );
 
     return pedidos.map((p) => ({
       ...p,
@@ -116,25 +145,25 @@ export class PedidosService implements OnModuleInit {
   async create(data: { productoId: number; cantidad: number }): Promise<Pedido> {
     this.logger.log(`[TCP] Crear pedido → verificar svc-productos`);
 
-    let producto: any;
-    try {
-      producto = await firstValueFrom(
-        this.productosTcpClient
-          .send({ cmd: 'get_producto' }, { id: data.productoId })
-          .pipe(
-            timeout(4000),
-            catchError((err) => {
-              this.logger.error(`svc-productos TCP no responde: ${err.message}`);
-              throw new Error('svc-productos no disponible - pedido no creado');
-            }),
-          ),
-      );
-    } catch (err) {
-      throw err;
-    }
+    const producto: any = await firstValueFrom(
+      this.productosTcpClient
+        .send({ cmd: 'get_producto' }, { id: data.productoId })
+        .pipe(
+          timeout(4000),
+          catchError((err) => {
+            this.logger.error(`Error consultando svc-productos: ${err?.message}`);
+            throw new RpcException(this.errorProductos(err));
+          }),
+        ),
+    );
 
     if (!producto) {
-      throw new Error(`Producto ${data.productoId} no encontrado`);
+      // Error de negocio con identidad: 404, no un Error genérico
+      throw new RpcException({
+        statusCode: 404,
+        message: `Producto ${data.productoId} no encontrado - pedido no creado`,
+        origen: 'svc-productos',
+      });
     }
 
     const pedido = this.pedidoRepo.create({

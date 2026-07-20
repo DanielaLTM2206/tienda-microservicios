@@ -25,6 +25,9 @@ services:
       POSTGRES_DB: app
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Crea pedidos_db y productos_db al inicializar el volumen
+      # (si el volumen ya existia: docker compose down -v y volver a levantar)
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 10s
@@ -74,7 +77,7 @@ services:
       DB_PORT: "5432"
       DB_USER: app
       DB_PASS: app
-      DB_NAME: app
+      DB_NAME: productos_db
     ports:
       - "5000:5000"    # gRPC expuesto para pruebas con grpcurl
     depends_on:
@@ -94,7 +97,7 @@ services:
       DB_PORT: "5432"
       DB_USER: app
       DB_PASS: app
-      DB_NAME: app
+      DB_NAME: pedidos_db
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       SVC_PRODUCTOS_HOST: svc-productos
