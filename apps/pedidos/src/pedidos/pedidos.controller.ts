@@ -15,6 +15,17 @@ export class PedidosController {
 
   constructor(private readonly pedidosService: PedidosService) {}
 
+  /**
+   * Handler de 1 SALTO para la medición de latencia por salto (C2 rúbrica):
+   * responde inmediatamente sin tocar BD ni llamar a svc-productos.
+   * Comparar GET /api/pedidos/ping (1 salto) contra GET /api/pedidos (2 saltos)
+   * aísla el costo del segundo salto TCP.
+   */
+  @MessagePattern({ cmd: 'ping' })
+  ping() {
+    return { ok: true, servicio: 'svc-pedidos', saltos: 1 };
+  }
+
   // ── Avance 1 (se conservan) ──────────────────────────────────────────────
 
   @MessagePattern({ cmd: 'get_pedidos' })

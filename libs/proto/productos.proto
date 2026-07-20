@@ -1,6 +1,6 @@
 // productos.proto — Contrato gRPC del sistema ShopMS
 // Usado por: svc-pedidos (cliente) <-> svc-productos (servidor)
-// Monorepo: apps/proto/productos.proto
+// Monorepo: libs/proto/productos.proto
 //
 // Patrón: Contract-First (el contrato define la interfaz antes de implementar)
 // Principio ISP: la interfaz expone solo lo necesario para la comunicación.

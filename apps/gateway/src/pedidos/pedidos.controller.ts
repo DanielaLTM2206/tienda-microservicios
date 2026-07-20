@@ -29,7 +29,47 @@ export class PedidosController {
     @Inject('PEDIDOS_SERVICE') private readonly pedidosClient: ClientProxy,
   ) {}
 
+  /**
+   * Traduce un error de la capa RPC a HttpException SIN perder la causa real.
+   * Los microservicios propagan errores estructurados ({ statusCode, message })
+   * gracias a AllRpcExceptionsFilter, así que aquí se reporta al culpable real
+   * (p. ej. "svc-productos no disponible") en vez de un mensaje fijo.
+   */
+  private rpcAHttp(err: any, contexto: string): HttpException {
+    if (err?.name === 'TimeoutError') {
+      return new HttpException(
+        `${contexto}: svc-pedidos no responde (timeout) - acoplamiento temporal demostrado`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+    const mensaje = err?.message ?? 'error desconocido en la cadena síncrona';
+    const status =
+      typeof err?.statusCode === 'number'
+        ? err.statusCode
+        : HttpStatus.SERVICE_UNAVAILABLE;
+    return new HttpException(`${contexto}: ${mensaje}`, status);
+  }
+
   // ── Avance 1 (se conservan) ──────────────────────────────────────────────
+
+  /**
+   * GET /api/pedidos/ping
+   * Camino SÍNCRONO de UN salto: Gateway → svc-pedidos (TCP) y regreso.
+   * Existe para descomponer la latencia por salto: la diferencia con
+   * GET /api/pedidos (2 saltos + BD) es el costo del segundo salto.
+   */
+  @Get('ping')
+  async ping() {
+    this.logger.log('[TCP] GET /api/pedidos/ping → svc-pedidos (1 salto)');
+    return firstValueFrom(
+      this.pedidosClient.send({ cmd: 'ping' }, {}).pipe(
+        timeout(5000),
+        catchError((err) =>
+          throwError(() => this.rpcAHttp(err, 'Error en ping')),
+        ),
+      ),
+    );
+  }
 
   /**
    * GET /api/pedidos
@@ -43,13 +83,7 @@ export class PedidosController {
         this.pedidosClient.send({ cmd: 'get_pedidos' }, {}).pipe(
           timeout(5000),
           catchError((err) =>
-            throwError(
-              () =>
-                new HttpException(
-                  'svc-pedidos no responde - acoplamiento temporal demostrado',
-                  HttpStatus.SERVICE_UNAVAILABLE,
-                ),
-            ),
+            throwError(() => this.rpcAHttp(err, 'Error al listar pedidos')),
           ),
         ),
       );
@@ -74,14 +108,8 @@ export class PedidosController {
       const result = await firstValueFrom(
         this.pedidosClient.send({ cmd: 'create_pedido' }, body).pipe(
           timeout(5000),
-          catchError(() =>
-            throwError(
-              () =>
-                new HttpException(
-                  'Error en cadena síncrona - uno de los servicios no responde',
-                  HttpStatus.SERVICE_UNAVAILABLE,
-                ),
-            ),
+          catchError((err) =>
+            throwError(() => this.rpcAHttp(err, 'Error al crear pedido')),
           ),
         ),
       );

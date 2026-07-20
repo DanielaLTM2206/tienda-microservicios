@@ -25,6 +25,9 @@ services:
       POSTGRES_DB: app
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Crea pedidos_db y productos_db al inicializar el volumen
+      # (si el volumen ya existia: docker compose down -v y volver a levantar)
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 10s
@@ -50,7 +53,9 @@ services:
   # MS B — segundo salto de la cadena síncrona
   # (se levanta antes porque pedidos depende de él)
   svc-productos:
-    build: ./apps/productos
+    build:
+      context: .
+      dockerfile: ./apps/productos/Dockerfile
     container_name: ms-productos
     environment:
       TCP_PORT: 3002
@@ -58,7 +63,7 @@ services:
       DB_PORT: 5432
       DB_USER: app
       DB_PASS: app
-      DB_NAME: app
+      DB_NAME: productos_db
     depends_on:
       db:
         condition: service_healthy
@@ -67,7 +72,9 @@ services:
   # MS C — consumidor Redis (camino asíncrono)
   # Si este servicio se cae, el flujo asíncrono sigue aceptando peticiones
   svc-notificaciones:
-    build: ./apps/notificaciones
+    build:
+      context: .
+      dockerfile: ./apps/notificaciones/Dockerfile
     container_name: ms-notificaciones
     environment:
       REDIS_HOST: redis
@@ -79,7 +86,9 @@ services:
 
   # MS A — inicia la cadena síncrona y publica eventos Redis
   svc-pedidos:
-    build: ./apps/pedidos
+    build:
+      context: .
+      dockerfile: ./apps/pedidos/Dockerfile
     container_name: ms-pedidos
     environment:
       TCP_PORT: 3001
@@ -87,7 +96,7 @@ services:
       DB_PORT: 5432
       DB_USER: app
       DB_PASS: app
-      DB_NAME: app
+      DB_NAME: pedidos_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SVC_PRODUCTOS_HOST: ms-productos
@@ -105,7 +114,9 @@ services:
   # API GATEWAY — punto único de entrada HTTP
   # ─────────────────────────────────────────────────────────────────
   gateway:
-    build: ./apps/gateway
+    build:
+      context: .
+      dockerfile: ./apps/gateway/Dockerfile
     container_name: ms-gateway
     environment:
       PORT: 3000

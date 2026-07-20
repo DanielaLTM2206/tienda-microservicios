@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { AllRpcExceptionsFilter } from './filters/rpc-exception.filter';
 
 /**
  * svc-productos arranaca con DOS transportes simultáneos:
@@ -34,8 +35,15 @@ async function bootstrap() {
     },
   });
 
+  // Estrategia consistente de manejo de excepciones en TODOS los transportes:
+  // los errores cruzan TCP/gRPC como objeto estructurado, no como Error genérico
+  app.useGlobalFilters(new AllRpcExceptionsFilter());
+
+  // init() dispara los hooks de ciclo de vida (onModuleInit → seed de datos).
+  // Sin esto, en una app híbrida que nunca llama listen(), el seed no corre.
+  await app.init();
   await app.startAllMicroservices();
   console.log(`🟢 svc-productos escuchando en TCP :${process.env.TCP_PORT ?? '3002'}`);
-  console.log(`官方 svc-productos escuchando en gRPC :${process.env.GRPC_PORT ?? '5000'}`);
+  console.log(`🟣 svc-productos escuchando en gRPC :${process.env.GRPC_PORT ?? '5000'}`);
 }
 bootstrap();

@@ -31,6 +31,18 @@ export class AllRpcExceptionsFilter implements NestRpcExceptionFilter<Error> {
   private readonly logger = new Logger(AllRpcExceptionsFilter.name);
 
   catch(exception: any, host: ArgumentsHost): Observable<any> {
+    // RpcException ya trae un error estructurado — se propaga tal cual
+    // para que el llamador conserve la identidad del error (statusCode, origen)
+    if (exception instanceof RpcException) {
+      const error = exception.getError();
+      this.logger.error(
+        `[AllRpcExceptionsFilter] RpcException: ${JSON.stringify(error)}`,
+      );
+      return throwError(() =>
+        typeof error === 'object' ? error : { statusCode: 500, message: error },
+      );
+    }
+
     const message = exception?.message ?? 'Error desconocido';
     this.logger.error(`[AllRpcExceptionsFilter] Excepción capturada: ${message}`);
     // Retorna el error como mensaje estructurado — el servicio SIGUE VIVO
