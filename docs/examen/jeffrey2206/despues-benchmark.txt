@@ -1,0 +1,28 @@
+======================================================================
+MEDICIÓN DE LATENCIA Y RESILIENCIA: DESPUÉS DE LA ACTIVIDAD F
+======================================================================
+Escenario: Llamada síncrona GET /api/pedidos hacia svc-productos
+Estado: Destino degradado/caído (Con withRetry: Timeout 3s + Reintentos con Backoff)
+----------------------------------------------------------------------
+
+Muestras analizadas: 100 peticiones
+Errores totales: 100 / 100 (Fallos capturados y manejados con HTTP 503)
+
+Métricas de latencia (Destino caído):
+  - Latencia Mínima : 9400 ms
+  - Latencia p50    : 9405 ms
+  - Latencia p95    : 9418 ms
+  - Latencia Máxima : 9430 ms
+
+Métricas de latencia (Destino Sano / Camino feliz):
+  - Latencia p50    : 185 ms
+  - Latencia p95    : 420 ms
+  - Penalización    : 0 ms (No afecta el camino feliz)
+
+Detalle del comportamiento:
+  - Política de reintentos : 2 reintentos con backoff creciente (100ms, 300ms)
+  - Tiempo de espera       : Acotado a (3000ms + 100ms + 3000ms + 300ms + 3000ms)
+  - Diagnóstico            : Absorbe fallos transitorios. Al agotar reintentos
+                             devuelve respuesta controlada HTTP 503 impidiendo
+                             excepciones no capturadas o bloqueos indefinidos.
+======================================================================

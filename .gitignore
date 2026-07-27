@@ -5,3 +5,6 @@ dist/
 *.log
 pgdata/
 .DS_Store
+ACTIVIDADES.md
+BITACORA.plantilla.md
+ASIGNACION.md

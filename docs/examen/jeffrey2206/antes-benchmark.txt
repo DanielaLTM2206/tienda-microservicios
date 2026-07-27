@@ -1,0 +1,23 @@
+======================================================================
+MEDICIÓN DE LATENCIA Y RESILIENCIA: ANTES DE LA ACTIVIDAD F
+======================================================================
+Escenario: Llamada síncrona GET /api/pedidos hacia svc-productos
+Estado: Destino degradado/caído (Sin reintentos / Timeout fijo)
+----------------------------------------------------------------------
+
+Muestras analizadas: 100 peticiones
+Errores totales: 100 / 100 (100% de fallos)
+
+Métricas de latencia:
+  - Latencia Mínima : 4000 ms
+  - Latencia p50    : 4002 ms
+  - Latencia p95    : 4015 ms
+  - Latencia Máxima : 4022 ms
+
+Detalle del comportamiento:
+  - Política de reintentos : 0 reintentos
+  - Tiempo de espera       : Timeout fijo de 4000ms alcanzado siempre
+  - Diagnóstico            : Ante caída transitoria o degradación del
+                             microservicio destino, el cliente experimenta
+                             bloqueo temporal completo seguido de falla.
+======================================================================

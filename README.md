@@ -562,4 +562,23 @@ ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesS
 
 ## Tags de entrega
 
-- `v1-avance1` - Avance 1 completado - `v2-avance2` - Avance 2 completado - `v3-final` - *pendiente*
+- `v1-avance1` - Avance 1 completado - `v2-avance2` - Avance 2 completado - `v3-final` - *pendiente* - `examen-jeffrey2206` - Examen Final (Actividad F)
+
+---
+
+### Examen final — Jeffrey Manobanda
+
+**Actividad F — Resiliencia y medición: timeout + reintento**
+
+Implementé un helper `withRetry()` que añade **timeout configurable (3000 ms, justificado con el p95 del Avance 1) + 2 reintentos con backoff creciente (100 ms → 300 ms)** a las llamadas síncronas TCP de `svc-pedidos` hacia `svc-productos`. Cuando el destino está caído, el llamador responde un error controlado (503) en tiempo acotado, sin esperas indefinidas ni excepciones sin capturar. El camino feliz no recibe penalización.
+
+| Artefacto | Enlace |
+|---|---|
+| Rama | `exam/jeffrey2206` |
+| Bitácora | [`docs/examen/jeffrey2206/BITACORA.md`](docs/examen/jeffrey2206/BITACORA.md) |
+| Evidencia antes | [`docs/examen/jeffrey2206/antes-sin-resiliencia.md`](docs/examen/jeffrey2206/antes-sin-resiliencia.md) |
+| Evidencia después | [`docs/examen/jeffrey2206/despues-con-resiliencia.md`](docs/examen/jeffrey2206/despues-con-resiliencia.md) |
+| Helper de resiliencia | [`apps/pedidos/src/pedidos/resiliencia.helper.ts`](apps/pedidos/src/pedidos/resiliencia.helper.ts) |
+| Prueba automatizada | [`apps/pedidos/src/pedidos/resiliencia.helper.spec.ts`](apps/pedidos/src/pedidos/resiliencia.helper.spec.ts) |
+| Pull Request | *(enlace al PR — completar tras push)* |
+| Tag | `examen-jeffrey2206` |
