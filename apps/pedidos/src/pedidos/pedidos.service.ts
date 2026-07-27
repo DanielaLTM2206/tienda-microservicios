@@ -2,7 +2,9 @@ import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ClientProxy, ClientGrpc, RpcException } from '@nestjs/microservices';
-import { firstValueFrom, timeout, catchError, Observable } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { withRetry } from './resiliencia.helper';
 import Redis from 'ioredis';
 import { Pedido } from './pedido.entity';
 
@@ -119,17 +121,18 @@ export class PedidosService implements OnModuleInit {
     const pedidos = await this.pedidoRepo.find();
 
     const productos: any[] = await firstValueFrom(
-      this.productosTcpClient
-        .send({ cmd: 'get_productos' }, {})
-        .pipe(
-          timeout(4000),
-          catchError((err) => {
-            this.logger.error(`Error consultando svc-productos: ${err?.message}`);
-            // Propagar el error SIN perder identidad: si svc-productos ya
-            // envió un error estructurado, se reenvía tal cual
-            throw new RpcException(this.errorProductos(err));
-          }),
-        ),
+      withRetry(
+        this.productosTcpClient.send({ cmd: 'get_productos' }, {}),
+        this.logger,
+        'get_productos',
+      ).pipe(
+        catchError((err) => {
+          this.logger.error(`Error consultando svc-productos: ${err?.message}`);
+          // Propagar el error SIN perder identidad: si svc-productos ya
+          // envió un error estructurado, se reenvía tal cual
+          throw new RpcException(this.errorProductos(err));
+        }),
+      ),
     );
 
     return pedidos.map((p) => ({
@@ -146,15 +149,16 @@ export class PedidosService implements OnModuleInit {
     this.logger.log(`[TCP] Crear pedido → verificar svc-productos`);
 
     const producto: any = await firstValueFrom(
-      this.productosTcpClient
-        .send({ cmd: 'get_producto' }, { id: data.productoId })
-        .pipe(
-          timeout(4000),
-          catchError((err) => {
-            this.logger.error(`Error consultando svc-productos: ${err?.message}`);
-            throw new RpcException(this.errorProductos(err));
-          }),
-        ),
+      withRetry(
+        this.productosTcpClient.send({ cmd: 'get_producto' }, { id: data.productoId }),
+        this.logger,
+        'get_producto',
+      ).pipe(
+        catchError((err) => {
+          this.logger.error(`Error consultando svc-productos: ${err?.message}`);
+          throw new RpcException(this.errorProductos(err));
+        }),
+      ),
     );
 
     if (!producto) {
