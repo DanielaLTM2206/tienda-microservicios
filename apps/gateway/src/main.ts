@@ -1,7 +1,23 @@
+import * as Sentry from '@sentry/node';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+
+/**
+ * Sentry se inicializa ANTES de crear la app Nest para capturar también
+ * los errores que ocurran durante el bootstrap (conexiones, módulos, etc.).
+ * Si SENTRY_DSN no está definido o está vacío, el bloque no se ejecuta
+ * y el sistema arranca normalmente sin ninguna dependencia de Sentry.
+ */
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    serverName: 'gateway',
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 1.0,
+  });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
