@@ -20,6 +20,13 @@ interface ProductosGrpcService {
     error: string;
   }>;
   ListarProductos(data: Record<string, never>): Observable<{ productos: any[] }>;
+  // [Examen B] Nuevo metodo del contrato productos.proto
+  VerificarDisponibilidad(data: { id: number; cantidad: number }): Observable<{
+    disponible: boolean;
+    precio: number;
+    mensaje: string;
+    codigo_error: string;
+  }>;
 }
 
 /**
@@ -298,5 +305,93 @@ export class PedidosService implements OnModuleInit {
     }
 
     return { ok: true, cola };
+  }
+
+
+  // EXAMEN B — Nuevo salto sincrono con contrato
+
+
+  /**
+   * [CAMINO E — gRPC] Verificar disponibilidad de un producto.
+   * Consume el nuevo metodo VerificarDisponibilidad del contrato productos.proto.
+   *
+   * Mapeo de errores del contrato al codigo HTTP correcto:
+   *   - NOT_FOUND       → RpcException 404
+   *   - INVALID_ARGUMENT → RpcException 400
+   *   - timeout/caido   → RpcException 503
+   *
+   * Anclaje C2: reutiliza el stub productosGrpcStub inicializado en
+   * onModuleInit() y el cliente PRODUCTOS_GRPC_SERVICE
+   * registrado en pedidos.module.ts.
+   */
+  async verificarDisponibilidadGrpc(
+    id: number,
+    cantidad: number,
+  ): Promise<any> {
+    this.logger.log(
+      `[gRPC] VerificarDisponibilidad id=${id}, cantidad=${cantidad}`,
+    );
+
+    try {
+      const respuesta = await firstValueFrom(
+        this.productosGrpcStub
+          .VerificarDisponibilidad({ id, cantidad })
+          .pipe(
+            timeout(5000),
+            catchError((err) => {
+              // Caso borde: servicio destino caido — no cuelga
+              this.logger.error(
+                `[gRPC] Timeout o error de transporte: ${err.message}`,
+              );
+              throw new RpcException({
+                statusCode: 503,
+                message: 'svc-productos no disponible (timeout)',
+                origen: 'svc-productos-grpc',
+              });
+            }),
+          ),
+      );
+
+      // Traducir codigo de error del contrato al codigo HTTP correcto
+      if (respuesta.codigo_error === 'NOT_FOUND') {
+        this.logger.warn(`[gRPC] NOT_FOUND → 404: ${respuesta.mensaje}`);
+        throw new RpcException({
+          statusCode: 404,
+          message: respuesta.mensaje,
+          origen: 'svc-productos-grpc',
+        });
+      }
+
+      if (respuesta.codigo_error === 'INVALID_ARGUMENT') {
+        this.logger.warn(`[gRPC] INVALID_ARGUMENT → 400: ${respuesta.mensaje}`);
+        throw new RpcException({
+          statusCode: 400,
+          message: respuesta.mensaje,
+          origen: 'svc-productos-grpc',
+        });
+      }
+
+      this.logger.log(
+        `[gRPC] Verificacion ok: disponible=${respuesta.disponible}, precio=${respuesta.precio}`,
+      );
+      return {
+        ok: true,
+        transporte: 'gRPC',
+        disponible: respuesta.disponible,
+        precio: respuesta.precio,
+        mensaje: respuesta.mensaje,
+      };
+    } catch (err) {
+      // Re-lanzar RpcException sin envolverla de nuevo
+      if (err instanceof RpcException) throw err;
+
+      // Error de infraestructura no controlado
+      this.logger.error(`[gRPC] Error capturado: ${err.message}`);
+      throw new RpcException({
+        statusCode: 502,
+        message: `Error al verificar disponibilidad: ${err.message}`,
+        origen: 'svc-productos-grpc',
+      });
+    }
   }
 }
