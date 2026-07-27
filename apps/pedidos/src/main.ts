@@ -1,13 +1,26 @@
+import * as Sentry from '@sentry/node';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 import { AllRpcExceptionsFilter } from './filters/rpc-exception.filter';
 
 /**
- * svc-pedidos — Avance 2.
+ * svc-pedidos — Avance 2 + Avance 3 (Sentry).
  * Escucha en TCP :3001 (igual que Avance 1).
  * Aplica AllRpcExceptionsFilter globalmente para que ningún error tumbe el servicio.
+ *
+ * Sentry se inicializa ANTES de crear el microservicio para capturar errores
+ * de bootstrap. Sin SENTRY_DSN el bloque se omite y el servicio arranca normal.
  */
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    serverName: 'svc-pedidos',
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 1.0,
+  });
+}
+
 async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule,

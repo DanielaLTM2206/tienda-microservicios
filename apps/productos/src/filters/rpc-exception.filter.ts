@@ -1,6 +1,7 @@
 import { Catch, RpcExceptionFilter as NestRpcExceptionFilter, ArgumentsHost, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { throwError, Observable } from 'rxjs';
+import * as Sentry from '@sentry/node';
 
 /**
  * AllRpcExceptionsFilter — captura CUALQUIER excepción en los handlers
@@ -9,6 +10,12 @@ import { throwError, Observable } from 'rxjs';
  * Sin este filtro, los errores cruzan el transporte como Error genérico
  * y pierden identidad: el llamador no puede saber qué servicio falló ni
  * con qué código. Con él, svc-pedidos recibe { statusCode, message, origen }.
+ *
+ * Sentry — decisión de diseño:
+ *   Solo capturamos excepciones inesperadas (no RpcException). Las RpcException
+ *   son errores controlados de negocio (producto no existe, etc.) y llenarían
+ *   el panel de ruido. Solo los fallos genuinamente inesperados (5xx) van a Sentry.
+ *   El tag 'transport' indica si vino de TCP o gRPC para facilitar el filtrado.
  */
 @Catch()
 export class AllRpcExceptionsFilter implements NestRpcExceptionFilter<Error> {
@@ -20,6 +27,7 @@ export class AllRpcExceptionsFilter implements NestRpcExceptionFilter<Error> {
       this.logger.error(
         `[AllRpcExceptionsFilter] RpcException: ${JSON.stringify(error)}`,
       );
+      // Errores de negocio controlados — NO van a Sentry
       return throwError(() =>
         typeof error === 'object' ? error : { statusCode: 500, message: error },
       );
@@ -27,6 +35,18 @@ export class AllRpcExceptionsFilter implements NestRpcExceptionFilter<Error> {
 
     const message = exception?.message ?? 'Error desconocido';
     this.logger.error(`[AllRpcExceptionsFilter] Excepción capturada: ${message}`);
+
+    // Excepción no controlada en svc-productos: la capturamos en Sentry con contexto
+    Sentry.withScope((scope) => {
+      scope.setTag('service', 'svc-productos');
+      // El filtro cubre TCP y gRPC; ambos comparten el mismo handler
+      scope.setTag('transport', 'TCP/gRPC');
+      scope.setExtra('statusCode', 500);
+      scope.setExtra('message', message);
+      scope.setExtra('origen', 'svc-productos');
+      Sentry.captureException(exception instanceof Error ? exception : new Error(message));
+    });
+
     return throwError(() => ({
       statusCode: 500,
       message,

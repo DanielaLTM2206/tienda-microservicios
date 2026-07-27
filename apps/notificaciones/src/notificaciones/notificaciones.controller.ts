@@ -1,5 +1,6 @@
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
+import * as Sentry from '@sentry/node';
 import { NotificacionesService } from './notificaciones.service';
 
 /**
@@ -25,6 +26,9 @@ export class NotificacionesController {
    *
    * Manejo de excepciones: el try/catch en el servicio garantiza que
    * un mensaje malformado NO tumbe el consumidor.
+   *
+   * Sentry: si el procesamiento falla de forma inesperada, lo capturamos
+   * con el payload del evento fallido para facilitar el diagnóstico.
    */
   @EventPattern('stock.actualizar')
   async handleStockActualizar(@Payload() data: any) {
@@ -34,6 +38,17 @@ export class NotificacionesController {
     } catch (err) {
       // Manejo de excepción en capa de servicios — el consumidor SIGUE VIVO
       this.logger.error(`❌ [RabbitMQ] Error procesando evento: ${err.message}`);
+
+      // Captura en Sentry con el payload del evento fallido como contexto.
+      // Esto permite diagnosticar si el problema es un mensaje malformado
+      // (dato extra en el payload) o un error de infraestructura del servicio.
+      Sentry.withScope((scope) => {
+        scope.setTag('service', 'svc-notificaciones');
+        scope.setTag('transport', 'RabbitMQ');
+        scope.setExtra('event', 'stock.actualizar');
+        scope.setExtra('payload', data);
+        Sentry.captureException(err instanceof Error ? err : new Error(String(err)));
+      });
     }
   }
 }

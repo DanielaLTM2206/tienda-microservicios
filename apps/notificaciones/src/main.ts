@@ -1,9 +1,10 @@
+import * as Sentry from '@sentry/node';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 
 /**
- * svc-notificaciones — Avance 2.
+ * svc-notificaciones — Avance 2 + Avance 3 (Sentry).
  *
  * Ahora consume DOS fuentes de eventos:
  *   1. Redis PUB/SUB  — canal 'eventos:notificaciones' (Avance 1, se conserva)
@@ -14,7 +15,19 @@ import { AppModule } from './app.module';
  *
  * Arquitectura híbrida: createApplicationContext (para Redis) + microservice (para RMQ).
  * Permite demostrar el SEGUNDO TRANSPORTE asíncrono (criterio C2 de la rúbrica).
+ *
+ * Sentry se inicializa ANTES de crear la app para capturar errores de bootstrap.
+ * Sin SENTRY_DSN el bloque se omite — sin dependencia de Sentry en entorno local.
  */
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    serverName: 'svc-notificaciones',
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 1.0,
+  });
+}
+
 async function bootstrap() {
   // Crear la aplicación base (para que NotificacionesService maneje Redis internamente)
   const app = await NestFactory.create(AppModule);
