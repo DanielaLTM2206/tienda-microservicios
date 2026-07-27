@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException, Logger, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import type { StringValue } from 'ms';
 import { LoginDto } from './dto/login.dto';
@@ -82,10 +83,15 @@ export class AuthService implements OnModuleInit {
 
     const expiresIn = process.env.JWT_EXPIRES_IN ?? '1h';
 
+    // Examen final (Actividad A): cada token lleva un identificador unico de
+    // sesion (`jti`). Es lo que permite revocar UNA sesion concreta en el
+    // logout sin invalidar las demas sesiones del mismo usuario ni rotar
+    // JWT_SECRET (que las tumbaria todas, incluidas las de otros usuarios).
     const payload = {
       sub: usuario.id,
       username: usuario.username,
       rol: usuario.rol,
+      jti: randomUUID(),
     };
 
     const access_token = await this.jwtService.signAsync(payload, {

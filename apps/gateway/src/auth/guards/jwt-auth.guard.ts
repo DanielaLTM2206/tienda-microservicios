@@ -6,8 +6,9 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { Observable } from 'rxjs';
+import { Observable, lastValueFrom, isObservable } from 'rxjs';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { TokenRevocationService } from '../token-revocation.service';
 
 /**
  * JwtAuthGuard — Avance 3, Criterio C2 (AUTENTICACIÓN de la petición).
@@ -32,13 +33,35 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 export class JwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
-  constructor(private readonly reflector: Reflector) {
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly revocacion: TokenRevocationService,
+  ) {
     super();
   }
 
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  /**
+   * Examen final (Actividad A): se añade un SEGUNDO paso de validacion.
+   *
+   *   1. Passport verifica firma y expiracion (comportamiento previo).
+   *   2. NUEVO: se comprueba que el `jti` no este en la lista de revocados.
+   *
+   * El orden importa: primero la firma, porque no tiene sentido consultar
+   * Redis por el `jti` de un token que ni siquiera es autentico — eso
+   * permitiria a un anonimo generar trafico contra el almacen.
+   *
+   * PRINCIPIOS APLICADOS:
+   *
+   *   OCP (Open/Closed) — el guard se EXTIENDE con un paso nuevo sin
+   *   modificar el anterior: la llamada a super.canActivate() (firma y
+   *   expiracion) queda intacta, y el paso 2 se encadena despues. Por eso
+   *   los casos de prueba del comportamiento previo siguen pasando.
+   *
+   *   DIP (Dependency Inversion) — este guard no conoce Redis. Depende de
+   *   TokenRevocationService, inyectado por el contenedor de Nest. La
+   *   decision de donde vive la lista de revocados no le afecta.
+   */
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     // getAllAndOverride: el decorador del handler gana sobre el del controlador
     const esPublica = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -49,7 +72,40 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    return super.canActivate(context);
+    // Paso 1 — validacion de firma y expiracion (Passport), como antes
+    const resultado = super.canActivate(context);
+    const autenticado = isObservable(resultado)
+      ? await lastValueFrom(resultado as Observable<boolean>)
+      : await resultado;
+
+    if (!autenticado) {
+      return false;
+    }
+
+    // Paso 2 — la sesion no debe estar revocada
+    const request = context.switchToHttp().getRequest();
+    const jti = request.user?.jti;
+
+    if (!jti) {
+      // Token firmado correctamente pero emitido antes de que existiera el
+      // claim `jti`: no se puede saber si su sesion fue cerrada, asi que se
+      // rechaza en vez de asumir que sigue viva.
+      this.logger.warn('401 — token valido pero sin claim jti (token antiguo)');
+      throw new UnauthorizedException(
+        'No autorizado: el token no incluye identificador de sesion (jti). Vuelve a iniciar sesion.',
+      );
+    }
+
+    if (await this.revocacion.estaRevocado(jti)) {
+      // Mensaje DISTINGUIBLE del de "token invalido o expirado": el token es
+      // autentico y esta vigente, lo que ocurre es que su sesion se cerro.
+      this.logger.warn(`401 — token revocado jti=${jti}`);
+      throw new UnauthorizedException(
+        'Sesion cerrada: este token fue revocado mediante logout',
+      );
+    }
+
+    return true;
   }
 
   /**

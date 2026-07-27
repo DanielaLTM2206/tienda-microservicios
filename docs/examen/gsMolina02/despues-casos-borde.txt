@@ -1,0 +1,14 @@
+=== CASO BORDE 1: logout SIN token -> 401 (un anonimo no puede revocar) ===
+HTTP/1.1 401 Unauthorized
+{"statusCode":401,"message":"No autorizado: No auth token","path":"/api/auth/logout","timestamp":"2026-07-27T12:28:42.604Z"}
+
+=== CASO BORDE 2: logout DOS VECES con el mismo token -> no revienta ===
+HTTP/1.1 401 Unauthorized
+   (401 porque el guard ya lo rechaza: el token esta revocado. No hay caida)
+
+=== CASO BORDE 3: token DISTINTO y vigente de OTRO usuario sigue funcionando ===
+   GET /api/pedidos con token de 'cliente': HTTP 200
+
+=== Clave en Redis con su TTL ===
+jwt:revocado:0fe61879-6855-41da-abad-853cf2d83bc7
+3573

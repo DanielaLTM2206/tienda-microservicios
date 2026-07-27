@@ -25,12 +25,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /**
    * NestJS llama a este método SOLO si la firma ya fue verificada.
    * Mapea el payload a un objeto usuario limpio que queda en req.user.
+   *
+   * Examen final (Actividad A): se propagan también `jti` y `exp`.
+   *   - `jti` identifica la sesión y es la clave que se guarda al revocar.
+   *   - `exp` permite calcular el TTL de la entrada de revocación, para que
+   *     Redis la olvide justo cuando el token deja de ser válido por sí solo.
+   * Sin estos dos campos en req.user, ni el logout ni el guard podrían operar.
    */
-  async validate(payload: { sub: number; username: string; rol: string }) {
+  async validate(payload: {
+    sub: number;
+    username: string;
+    rol: string;
+    jti?: string;
+    exp?: number;
+  }) {
     return {
       userId: payload.sub,
       username: payload.username,
       rol: payload.rol,
+      jti: payload.jti,
+      exp: payload.exp,
     };
   }
 }

@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 177
+ETag: W/"b1-JQjfFNClOEc0nBt7h/YKI9UjZOc"
+Date: Mon, 27 Jul 2026 12:28:16 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[{"id":1,"productoId":1,"cantidad":2,"estado":"confirmado","creadoEn":"2026-07-27T04:05:21.205Z","producto":{"id":1,"nombre":"Laptop Pro","precio":"1299.99","disponible":true}}]
