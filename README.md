@@ -556,10 +556,347 @@ ms-notificaciones  | [Nest] 1  - 07/18/2026, 3:47:00 AM     LOG [NotificacionesS
 
 ## Avance 3 - Seguridad, observabilidad e integracion (FINAL) - `tag v3-final`
 
-> *Pendiente - Tarea 3*
+### Diagrama del sistema final integrado (Avance 3)
+
+```
++---------------------------------------------------------------------------------+
+|                       CLIENTE (curl / Postman / Navegador)                      |
++--------------------------------------+------------------------------------------+
+                                       | HTTP :3000
+                                       v
++---------------------------------------------------------------------------------+
+|                        API GATEWAY  (gateway:3000)                              |
+|  prefijo global: /api                                                           |
+|                                                                                 |
+|  ┌─────────────────────────────────────────────────────────────────────────┐   |
+|  │  CAPA DE SEGURIDAD (Avance 3 — Steven + Daniela)                        │   |
+|  │  JwtAuthGuard (global) + RolesGuard (global)                            │   |
+|  │  Politica: DENEGAR por defecto — solo @Public() o token valido pasan    │   |
+|  │  Rutas publicas: GET /api/health  POST /api/auth/login                  │   |
+|  └─────────────────────────────────────────────────────────────────────────┘   |
+|                                                                                 |
+|  AllExceptionsFilter global                                                     |
+|    └─► Sentry.captureException (solo errores 5xx)                              |
+|        tags: service=gateway, transport=HTTP                                    |
+|        extra: url, method, statusCode, body                                     |
++-----+----------+--------------------+------------------------+------------------+
+      |          |                    |                        |
+ TCP  |    Redis |              gRPC  |           RabbitMQ     |
+:3001 |  PUBLISH |              :5000 |           PUBLISH      |
+      v          v                    v                        v
++------------------+  +-----------+  +--------------------+  +--------------------+
+|  svc-pedidos     |  |  Redis    |  |  svc-pedidos       |  |  svc-pedidos       |
+|  TCP :3001       |  | (canal    |  |  TCP :3001         |  |  TCP :3001         |
+|                  |  | eventos:  |  |                    |  |                    |
+|  Sentry init     |  | notif.)   |  |  Sentry init       |  |  Sentry init       |
+|  AllRpcExcFilter |  +-----+-----+  |  AllRpcExcFilter   |  |                    |
+|  (TCP/Sentry)    |        |        |  (TCP/Sentry)      |  |                    |
++------------------+        |SUBSCR. +--------+-----------+  +--------+-----------+
+                            v                 | gRPC                   | RabbitMQ
+                   +--------+----------+      v                        v
+                   | svc-notificaciones |  +--------------------+  +--------------------+
+                   | Redis PUB/SUB     |  |  svc-productos     |  |  RabbitMQ          |
+                   | Sentry init       |  |  TCP :3002         |  |  cola:             |
+                   +-------------------+  |  gRPC :5000        |  |  stock_actualizar  |
+                                          |  Hybrid App        |  +--------+-----------+
+                                          |  Sentry init       |           | CONSUME
+                                          |  AllRpcExcFilter   |           v
+                                          |  (TCP+gRPC/Sentry) |  +--------------------+
+                                          +--------------------+  |  svc-notificaciones|
+                                                                   |  RabbitMQ consumer |
+                                                                   |  Sentry en catch   |
+                                                                   +--------------------+
+
+Infraestructura (Avance 3 — docker-compose.final.yml de Steven):
+  PostgreSQL  <- svc-pedidos (pedidos_db), svc-productos (productos_db)
+  Redis       <- svc-pedidos (PUBLISH), svc-notificaciones (SUBSCRIBE)    [Avance 1]
+  RabbitMQ    <- svc-pedidos (PUBLISH), svc-notificaciones (CONSUME)      [Avance 2]
+  gRPC        <- svc-pedidos (cliente),  svc-productos (servidor)         [Avance 2]
+  JWT         <- gateway emite token en /api/auth/login; guards lo validan[Avance 3]
+  Sentry      <- los 4 servicios reportan 5xx con contexto enriquecido    [Avance 3]
+```
+
+---
+
+### Flujo de autenticacion JWT
+
+**Emision del token (`POST /api/auth/login`):**
+
+1. El cliente envia `{ "username": "...", "password": "..." }`.
+2. `AuthService.login()` busca el usuario en memoria, compara la contrasena con `bcrypt.compare()`.
+3. Si la contrasena es correcta, llama a `JwtService.sign({ sub, username, rol })`.
+4. El gateway devuelve `{ access_token: "<JWT>" }`.
+
+**Payload del token:**
+
+```json
+{
+  "sub": 1,
+  "username": "admin",
+  "rol": "admin",
+  "iat": 1753596000,
+  "exp": 1753599600
+}
+```
+
+- `sub`: identificador del usuario.
+- `username`: nombre de usuario.
+- `rol`: rol del usuario (`admin` o `cliente`) — usado por el `RolesGuard`.
+- `iat` / `exp`: emitido el / expira el. El token dura **1 hora** (configurado con `expiresIn: '1h'`).
+
+**Validacion del token:**
+
+El `JwtAuthGuard` (guard global registrado en `AppModule`) intercepta cada request antes del handler:
+
+1. Extrae el token del header `Authorization: Bearer <token>`.
+2. `JwtStrategy` lo verifica con la clave secreta (`JWT_SECRET`).
+3. Si es valido, inyecta el payload como `request.user`.
+4. Si no hay token o es invalido, lanza `401 Unauthorized`.
+
+**Politica de "denegar por defecto":**
+
+El guard es **global** — se aplica a TODAS las rutas sin excepcion. Las rutas publicas son la excepcion explicita:
+- `GET /api/health` — decorada con `@Public()` (no requiere token).
+- `POST /api/auth/login` — decorada con `@Public()` (es el endpoint de emision).
+
+Cualquier otra ruta requiere token valido + rol suficiente. Si se agrega una nueva ruta sin `@Public()`, automaticamente queda protegida sin ningun cambio adicional.
+
+**Cuando expira el token:**
+
+Despues de 1 hora el servidor devuelve `401 { "message": "la firma del token JWT no es valida" }`.
+El cliente debe volver a hacer `POST /api/auth/login` para obtener un token nuevo.
+
+---
+
+### Matriz de pruebas de seguridad
+
+| Peticion | Condicion | Resultado esperado | Resultado real |
+|---|---|---|---|
+| `GET /api/health` | Sin token | **200 OK** (ruta publica) | ✅ 200 |
+| `GET /api/pedidos` | Sin token | **401** "No auth token" | ✅ 401 |
+| `GET /api/pedidos` | Token corrupto/expirado | **401** "la firma del token JWT no es valida" | ✅ 401 |
+| `POST /api/auth/login` | Password incorrecta | **401** "Credenciales invalidas" | ✅ 401 |
+| `GET /api/pedidos` | Token valido | **200 OK** con lista de pedidos | ✅ 200 |
+| `POST /api/pedidos` | Token valido, rol `cliente` | **403** "se requiere rol [admin]..." | ✅ 403 |
+| `POST /api/pedidos` | Token valido, rol `admin` | **201 Created** con pedido creado | ✅ 201 |
+
+> Evidencia verificada en vivo por Steven (ver descripcion en el historial de commits de la rama feat/auth-guard).
+
+---
+
+### Integracion de Sentry (Observabilidad)
+
+**Que se captura y donde:**
+
+| Servicio | Tipo de excepcion capturada | Tags en Sentry | Extra |
+|---|---|---|---|
+| gateway | Solo errores 5xx (HttpException con status >= 500, Error no controlado) | `service=gateway`, `transport=HTTP` | `url`, `method`, `statusCode`, `body` |
+| svc-pedidos | Excepciones no controladas en handlers TCP (no RpcException) | `service=svc-pedidos`, `transport=TCP` | `statusCode`, `message` |
+| svc-productos | Excepciones no controladas en handlers TCP/gRPC (no RpcException) | `service=svc-productos`, `transport=TCP/gRPC` | `statusCode`, `message`, `origen` |
+| svc-notificaciones | Errores en el `catch` del consumidor RabbitMQ | `service=svc-notificaciones`, `transport=RabbitMQ` | `event`, `payload` |
+
+**Por que NO reportamos los 4xx esperados:**
+
+Los errores `401` (sin token), `403` (rol insuficiente), `400` (validacion de DTO) y `404` (producto inexistente) son **errores del cliente**, no del servidor. Son casos controlados y anticipados por el negocio. Reportarlos a Sentry llenaría el panel de ruido y oscultaría los problemas reales de infraestructura. La regla es: si el desarrollador ya sabe que ese error va a ocurrir y lo maneja conscientemente, no necesita aparecer en el panel de monitoreo.
+
+**Inicializacion sin DSN:**
+
+Si `SENTRY_DSN` no esta definido en el entorno (por ejemplo, en desarrollo local), el bloque `if (process.env.SENTRY_DSN) { Sentry.init({...}) }` se omite completamente. Los servicios arrancan sin ninguna dependencia de Sentry y sin errores.
+
+---
+
+### Manejo de excepciones consolidado (Avances 1-3)
+
+| Capa | Avance | Mecanismo | Efecto |
+|---|---|---|---|
+| **Gateway (HTTP)** | 1 | `AllExceptionsFilter` global | Convierte cualquier error en HTTP coherente (4xx/5xx), preserva mensaje de origen remoto |
+| **Gateway (HTTP)** | 3 | `AllExceptionsFilter` + bug fix `getResponse()` | Preserva los mensajes de validacion del `ValidationPipe` (`message[]` del DTO) |
+| **Gateway (HTTP)** | 3 | `AllExceptionsFilter` + Sentry | Reporta solo 5xx a Sentry con contexto HTTP completo |
+| **svc-pedidos (TCP)** | 1-2 | `RpcException` + `AllRpcExceptionsFilter` global | Errores cruzan TCP como objeto estructurado `{statusCode, message}` sin perder identidad |
+| **svc-pedidos (TCP)** | 3 | `AllRpcExceptionsFilter` + Sentry | Excepciones no controladas se reportan con tag `transport=TCP` |
+| **svc-productos (TCP+gRPC)** | 2 | `RpcException` + `AllRpcExceptionsFilter` global | Errores TCP/gRPC con `origen: svc-productos` — el gateway sabe que servicio fallo |
+| **svc-productos (TCP+gRPC)** | 3 | `AllRpcExceptionsFilter` + Sentry | Excepciones no controladas con tag `transport=TCP/gRPC` |
+| **svc-productos (gRPC)** | 2 | `try/catch` en `@GrpcMethod` | Retorna `encontrado=false` — error controlado que no cae el servicio |
+| **svc-pedidos (Service)** | 1-2 | `try/catch` por metodo | Fallos de Redis/RabbitMQ no fallan el flujo principal del pedido |
+| **svc-notificaciones (RabbitMQ)** | 2 | `try/catch` en `@EventPattern` | Mensaje malformado no tumba el consumidor |
+| **svc-notificaciones (RabbitMQ)** | 3 | `try/catch` + Sentry | Fallo inesperado se reporta con el payload del evento como contexto |
+
+---
+
+### Patrones y principios SOLID — Avance 3
+
+| Patron / Principio | Donde se aplica | Descripcion |
+|---|---|---|
+| **Strategy (Passport)** | `apps/gateway/src/auth/jwt.strategy.ts` | La estrategia JWT encapsula el algoritmo de validacion; el Guard la usa sin conocer el detalle |
+| **Guard (NestJS)** | `JwtAuthGuard`, `RolesGuard` | Interceptan la ejecucion ANTES del handler; leen metadatos (`@Public()`, `@Roles()`) a diferencia de un middleware que no puede |
+| **Decorator Pattern** | `@Public()`, `@Roles()` | Metadata personalizada que cambia el comportamiento del Guard sin modificar el codigo del handler |
+| **DTO + ValidationPipe** | `CreatePedidoDto`, `LoginDto` | Separa la validacion de la logica de negocio (SRP); el contrato del dato esta en el DTO |
+| **RBAC** | `RolesGuard` + `@Roles('admin')` | Control de acceso basado en roles — autorizar es distinto a autenticar |
+| **OCP** | `AllExceptionsFilter` | Se agrego Sentry sin modificar la logica de respuesta HTTP existente |
+| **SRP** | `AuthService`, `JwtStrategy`, `AllExceptionsFilter` | Cada clase tiene una sola razon para cambiar |
+
+---
+
+### Como ejecutar el sistema completo (Avance 3 — FINAL)
+
+```bash
+# Levantar todo el sistema con el compose final
+docker compose -f docker-compose.final.yml up -d --build
+
+# Verificar que todos los servicios estan corriendo
+docker compose -f docker-compose.final.yml ps
+
+# 1. Obtener token JWT
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+# Respuesta: { "access_token": "eyJhbG..." }
+
+# 2. Guardar el token
+TOKEN="eyJhbG..."
+
+# 3. Probar seguridad
+curl http://localhost:3000/api/pedidos                          # 401 sin token
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/pedidos  # 200 con token
+
+# 4. Probar validacion de DTOs (bug fix Avance 3)
+curl -X POST http://localhost:3000/api/pedidos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"productoId":1,"cantidad":-5}'
+# Respuesta corregida: { "statusCode":400, "message":["cantidad debe ser un entero positivo"] }
+
+# 5. Crear pedido valido (dispara TCP, gRPC, Redis y RabbitMQ)
+curl -X POST http://localhost:3000/api/pedidos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"productoId":1,"cantidad":2}'
+```
+
+---
+
+## Defensa — Guion de Exposicion
+
+### Estructura de diapositivas (8-10 diap., 10-12 min)
+
+| # | Titulo | Responsable | Contenido clave |
+|---|---|---|---|
+| 1 | **Portada** | Jeffrey | ShopMS — Avance 3 Final. Equipo, materia, fecha. |
+| 2 | **Problema y dominio** | Jeffrey | Gestion de pedidos. Por que microservicios. Dominio simple para enfocarse en arquitectura. |
+| 3 | **Arquitectura general** | Jeffrey | Diagrama del sistema final: 4 servicios, 4 transportes, JWT/Guard, Sentry. Mostrar el diagrama ASCII del Avance 3. |
+| 4 | **Avance 1: latencia y acoplamiento** | Daniela | Benchmark real: 2.71ms 1 salto vs 4.86ms 2 saltos. Diferencia = 2.15ms por salto TCP. Caida de svc-productos = 503. Redis no bloquea. |
+| 5 | **Avance 2: transportes y excepciones** | Steven | Tabla de los 4 transportes. gRPC con contrato .proto. RabbitMQ = cola durable. Exception filters en capas. |
+| 6 | **Avance 3: JWT/Guard + Sentry** | Daniela (JWT) + Steven (Guard) + Jeffrey (Sentry) | Flujo de emision/validacion JWT. Politica denegar por defecto. Guards vs middleware. Que captura Sentry y por que solo 5xx. |
+| 7 | **Temas de clase aplicados** | Daniela | Tabla SOLID: SRP, OCP, DIP, ISP. Patrones: API Gateway, Proxy, Pub/Sub, Exception Filter, Strategy, Guard, Decorator, RBAC. |
+| 8 | **DEMO EN VIVO** | Steven (compose) + Daniela (login/401/403) + Jeffrey (Sentry) | Ver runbook abajo. |
+| 9 | **Conclusiones** | Todos | Que aprendimos. Limitaciones honestas (repositorio unificado, no ramas separadas en Avances 1-2). Proximos pasos. |
+| 10 | **Cierre / Q&A** | Jeffrey | Agradecimiento. Preguntas del jurado. |
+
+---
+
+### Runbook de la DEMO EN VIVO
+
+```bash
+# Paso 1: Levantar el sistema completo
+docker compose -f docker-compose.final.yml up -d --build
+
+# Paso 2: Verificar que todos los servicios estan corriendo
+docker compose -f docker-compose.final.yml ps
+# Debe mostrar: ms-gateway, ms-pedidos, ms-productos, ms-notificaciones,
+#               postgres, redis, rabbitmq — todos con estado "Up"
+
+# Paso 3: Obtener el token JWT (Daniela)
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+# → Copiar el valor de access_token
+TOKEN="<pegar token aqui>"
+
+# Paso 4: Demostrar seguridad (Daniela)
+# 4a. Sin token → 401
+curl http://localhost:3000/api/pedidos
+# { "statusCode":401, "message":"No auth token" }
+
+# 4b. Con token → 200
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/pedidos
+# [ { "id":1, "productoId":1, ... }, ... ]
+
+# 4c. Con rol cliente → 403
+# (hacer login con usuario cliente primero)
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"cliente","password":"cliente123"}'
+TOKEN_CLIENTE="<pegar token cliente>"
+curl -X POST http://localhost:3000/api/pedidos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" \
+  -d '{"productoId":1,"cantidad":1}'
+# { "statusCode":403, "message":"se requiere rol [admin]..." }
+
+# Paso 5: Crear un pedido (muestra los 4 transportes en accion)
+curl -X POST http://localhost:3000/api/pedidos \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"productoId":1,"cantidad":2}'
+# Ver en logs: TCP (gateway->pedidos), gRPC (pedidos->productos),
+#              Redis PUBLISH, RabbitMQ emit
+docker compose -f docker-compose.final.yml logs --tail=20 ms-notificaciones
+
+# Paso 6: Provocar error 503 que aparece en Sentry (Jeffrey)
+docker compose -f docker-compose.final.yml stop ms-productos
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/pedidos
+# { "statusCode":503, "message":"Microservicio no disponible..." }
+# → Abrir el panel de Sentry y mostrar el evento capturado con
+#   tags: service=gateway, transport=HTTP, statusCode=503
+
+# Restaurar al terminar la demo
+docker compose -f docker-compose.final.yml start ms-productos
+```
+
+---
+
+### Preguntas probables del jurado y respuestas preparadas
+
+**¿Que informacion viaja dentro de un JWT y como se valida?**
+
+Un JWT tiene tres partes codificadas en Base64 separadas por puntos: `header.payload.signature`. El `payload` de este sistema contiene `{ sub, username, rol, iat, exp }`. El servidor valida la `signature` con `JWT_SECRET` — si alguien modifica el payload sin conocer el secreto, la firma no coincide y el servidor devuelve 401. No almacenamos el token en servidor (stateless); la validez se verifica matematicamente en cada request.
+
+**¿Que hace un Guard en NestJS y en que se diferencia de un middleware?**
+
+Un middleware corre ANTES del enrutamiento y no conoce el handler de destino, por lo que no puede leer metadatos como `@Public()` o `@Roles()`. Un Guard corre DESPUES del enrutamiento pero ANTES del handler, y tiene acceso al `ExecutionContext` — puede leer los metadatos decorados sobre el metodo o la clase. Por eso la autorizacion basada en roles y la decoracion `@Public()` solo son posibles en un Guard, no en un middleware.
+
+**Diferencia entre autenticacion (401) y autorizacion (403):**
+
+- **Autenticacion (401):** "No se quien eres." El token falta, esta mal formado o expiro. El servidor no puede identificar al usuario.
+- **Autorizacion (403):** "Se quien eres pero no tienes permiso." El token es valido, el usuario esta identificado, pero su rol no alcanza para la accion solicitada (por ejemplo, un `cliente` intentando hacer `POST /api/pedidos` que requiere rol `admin`).
+
+**¿Por que gRPC en el salto pedidos→productos y no TCP o eventos?**
+
+TCP NestJS es simple pero no tiene contrato formal — cualquier objeto puede cruzar el transporte y si el esquema cambia, el error es en tiempo de ejecucion. gRPC obliga a definir un `.proto` (contrato tipado, validado en tiempo de compilacion) y serializa con Protocol Buffers (binario, mas eficiente que JSON). Es sincronico porque en el flujo de creacion de pedido necesitamos la respuesta del producto ANTES de guardar el pedido — un evento asincrono no funciona ahi.
+
+**Diferencias entre los cuatro transportes que usamos:**
+
+| Transporte | Tipo | Patron | Garantia de entrega | Uso en el sistema |
+|---|---|---|---|---|
+| **TCP** | Sincrono | Peticion-respuesta | Alta (bloquea) | Gateway→pedidos, pedidos→productos (legado) |
+| **Redis PUB/SUB** | Asincrono | Publisher/Subscriber | Sin garantia (volatile) | Notificacion de pedido creado |
+| **RabbitMQ** | Asincrono | Cola de mensajes | Alta (cola durable) | Actualizacion de stock (no se puede perder) |
+| **gRPC** | Sincrono | Contrato RPC | Alta (bloquea, timeout) | pedidos→productos con contrato .proto tipado |
+
+**¿Para que sirve Sentry y que registramos ahi?**
+
+Sentry es una plataforma de monitoreo de errores. Cuando una excepcion no controlada ocurre en produccion, Sentry la captura automaticamente con el stack trace, el contexto (URL, payload, servicio, transporte) y la envia a un panel centralizado. En este sistema registramos solo los errores 5xx — los errores 4xx son del cliente y ya los manejamos conscientemente. El panel permite ver cual servicio fallo, con que payload y cuantas veces, sin tener que revisar logs manualmente.
+
+**¿Que patrones trae NestJS y cuales agregamos nosotros?**
+
+NestJS trae: inyeccion de dependencias, modulos (`@Module`), decoradores (`@Injectable`, `@MessagePattern`, `@GrpcMethod`), `ClientsModule`, `Transport.*`, `Repository` de TypeORM, `ValidationPipe`, `Passport`, `JwtModule`.
+
+Nosotros agregamos: `AllExceptionsFilter` global (con el bug fix de `getResponse()`), `AllRpcExceptionsFilter` para TCP/gRPC, `@Public()` y `@Roles()` como decoradores de metadata personalizados, la politica de "denegar por defecto" con guard global, la integracion de Sentry con la regla de filtrar 4xx, el seed de datos en `onModuleInit` con el fix de `app.init()` para apps hibridas, y el publicador/suscriptor Redis con `ioredis`.
 
 ---
 
 ## Tags de entrega
 
-- `v1-avance1` - Avance 1 completado - `v2-avance2` - Avance 2 completado - `v3-final` - *pendiente*
+- `v1-avance1` — Avance 1 completado
+- `v2-avance2` — Avance 2 completado
+- `v3-final` — Avance 3 final (rama `feat/observabilidad-sentry`)
