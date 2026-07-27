@@ -10,8 +10,8 @@
 | **Actividad asignada** | **A** — Revocación de sesión JWT (logout real) |
 | **Rama** | `exam/gsMolina02` |
 | **Tag** | `examen-gsMolina02` |
-| **Pull Request** | *(pegar enlace)* |
-| **Tarjeta Kanban** | *(pegar enlace)* |
+| **Pull Request** | [#24 — feat(auth): revocacion de sesion JWT — logout real](https://github.com/DanielaLTM2206/tienda-microservicios/pull/24) *(abierto, sin mergear)* |
+| **Tarjeta Kanban** | [ShopMS Board → columna `Hecho`](https://github.com/users/DanielaLTM2206/projects/1) — tarjeta `#24`, enlazada al PR |
 | **¿Hiciste el Paso 0?** | **No.** La base de JWT ya existía en el repo: login en `apps/gateway/src/auth/auth.service.ts:68` y guard en `apps/gateway/src/auth/guards/jwt-auth.guard.ts:33`, ambos entregados en el Avance 3 (PRs #12 y #13). `ASIGNACION.md` me listaba en Paso 0 por asumir que el Grupo 6 no publicó el Avance 3, pero sí se publicó. |
 
 ---
@@ -134,6 +134,12 @@ Cuando Daniela añadió `bcrypt` al gateway, Claude afirmó que **fallaría al c
 |---|---|
 | `prueba-antes-sin-el-cambio.png` / `.txt` | La suite contra el guard **anterior**: 3 fallos, 2 pasan. Los 3 que fallan son exactamente los del comportamiento nuevo |
 | `prueba-despues-con-el-cambio.png` / `.txt` | La misma suite con el cambio aplicado: **5 de 5 pasando** |
+
+**Proceso (entregable 8):**
+
+| Archivo | Qué demuestra |
+|---|---|
+| `kanban-examen.png` | Tarjeta `#24` en la columna `Hecho` del ShopMS Board, enlazada al Pull Request |
 
 **Cómo reproducir mi cambio desde cero:**
 
