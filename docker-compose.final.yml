@@ -2,17 +2,38 @@
 #  docker-compose.final.yml  —  Tarea 3 (sistema integrado)  ·  solo temas vistos
 #
 #  Es el sistema completo de las Tareas 1 y 2 + seguridad y observabilidad:
+#   - CUATRO transportes: TCP, Redis PUB/SUB, gRPC y RabbitMQ.
 #   - JWT + Guard en el Gateway (variable JWT_SECRET).
-#   - Sentry para logs (variable SENTRY_DSN).
+#   - Sentry para logs en los cuatro servicios (variable SENTRY_DSN).
 #
 #  Levantar:   docker compose -f docker-compose.final.yml up -d --build
-#  (Definan JWT_SECRET y SENTRY_DSN en un archivo .env junto a este compose.)
+#  Ver estado: docker compose -f docker-compose.final.yml ps
+#  Ver logs:   docker compose -f docker-compose.final.yml logs -f
+#  Detener:    docker compose -f docker-compose.final.yml down
+#  Panel RMQ:  http://localhost:15672  (guest / guest)
+#
+#  Definan JWT_SECRET y SENTRY_DSN en un archivo .env junto a este compose
+#  (ver .env.example). El .env NO se sube al repositorio.
 # =============================================================================
+
 services:
+
+  # ─── INFRAESTRUCTURA ──────────────────────────────────────────────────────
 
   db:
     image: postgres:16-alpine
-    environment: { POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app }
+    container_name: ms-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Crea pedidos_db y productos_db al inicializar el volumen. Sin esto los
+      # dos servicios comparten la BD "app" con synchronize:true, que es una
+      # condicion de carrera al arrancar.
+      # (si el volumen ya existia: docker compose ... down -v y volver a levantar)
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 10s
@@ -20,47 +41,125 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Transporte B: Redis PUB/SUB (Avance 1)
   redis:
     image: redis:7-alpine
+    container_name: ms-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
+  # Transporte D: RabbitMQ — segundo transporte asincrono (Avance 2)
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    ports: ["15672:15672"]
+    container_name: ms-rabbitmq
+    ports:
+      - "15672:15672"  # Panel de administracion web (evidencia de la demo)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
     restart: unless-stopped
 
-  svc-pedidos:
-    build: ./apps/pedidos
-    environment:
-      DB_HOST: db
-      REDIS_HOST: redis
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
-      GRPC_PRODUCTOS_URL: svc-productos:5000
-      SENTRY_DSN: ${SENTRY_DSN:-}
-    depends_on: [db, redis, rabbitmq, svc-productos]
-    restart: unless-stopped
+  # ─── MICROSERVICIOS ───────────────────────────────────────────────────────
 
+  # MS B — svc-productos: servidor TCP (Avance 1) + servidor gRPC (Avance 2).
+  # Se levanta primero porque svc-pedidos depende de el por ambos transportes.
   svc-productos:
-    build: ./apps/productos
-    environment: { DB_HOST: db, GRPC_PORT: 5000, SENTRY_DSN: ${SENTRY_DSN:-} }
-    depends_on: [db]
-    restart: unless-stopped
-
-  svc-notificaciones:
-    build: ./apps/notificaciones
-    environment: { RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672, SENTRY_DSN: ${SENTRY_DSN:-} }
-    depends_on: [rabbitmq]
-    restart: unless-stopped
-
-  # Gateway con AUTENTICACIÓN JWT + GUARD y logs con Sentry.
-  gateway:
-    build: ./apps/gateway
+    build:
+      # Contexto = RAIZ del monorepo: los Dockerfiles necesitan el
+      # package-lock.json y libs/proto, que viven fuera de apps/productos.
+      context: .
+      dockerfile: ./apps/productos/Dockerfile
+    container_name: ms-productos
     environment:
+      TCP_PORT: "3002"
+      GRPC_PORT: "5000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: app
+      DB_PASS: app
+      DB_NAME: productos_db
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MS A — svc-pedidos: cliente TCP + cliente gRPC + publicador Redis + publicador RabbitMQ
+  svc-pedidos:
+    build:
+      context: .
+      dockerfile: ./apps/pedidos/Dockerfile
+    container_name: ms-pedidos
+    environment:
+      TCP_PORT: "3001"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: app
+      DB_PASS: app
+      DB_NAME: pedidos_db
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SVC_PRODUCTOS_HOST: svc-productos
+      SVC_PRODUCTOS_PORT: "3002"
+      GRPC_PRODUCTOS_URL: "svc-productos:5000"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      svc-productos:
+        condition: service_started
+    restart: unless-stopped
+
+  # MS C — svc-notificaciones: suscriptor Redis (Avance 1) + consumidor RabbitMQ (Avance 2)
+  svc-notificaciones:
+    build:
+      context: .
+      dockerfile: ./apps/notificaciones/Dockerfile
+    container_name: ms-notificaciones
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── API GATEWAY ──────────────────────────────────────────────────────────
+  # Punto unico de entrada HTTP, con AUTENTICACION JWT + GUARD y logs de Sentry.
+  gateway:
+    build:
+      context: .
+      dockerfile: ./apps/gateway/Dockerfile
+    container_name: ms-gateway
+    environment:
+      PORT: "3000"
+      # svc-pedidos escucha TCP en 3001, no en 3000
       SVC_PEDIDOS_HOST: svc-pedidos
-      SVC_PEDIDOS_PORT: 3000
+      SVC_PEDIDOS_PORT: "3001"
       JWT_SECRET: ${JWT_SECRET:-cambienme_por_un_secreto}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
       SENTRY_DSN: ${SENTRY_DSN:-}
-    ports: ["3000:3000"]
-    depends_on: [svc-pedidos]
+    ports:
+      - "3000:3000"
+    depends_on:
+      svc-pedidos:
+        condition: service_started
     restart: unless-stopped
+
+volumes:
+  pgdata:
