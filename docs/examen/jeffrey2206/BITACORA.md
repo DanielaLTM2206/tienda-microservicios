@@ -12,8 +12,8 @@
 | **Actividad asignada** | F — Resiliencia y medición: timeout + reintento |
 | **Rama** | `exam/jeffrey2206` |
 | **Tag** | `examen-jeffrey2206` |
-| **Pull Request** | *(enlace al PR — completar tras push)* |
-| **Tarjeta Kanban** | *(enlace a la tarjeta — completar tras crear en Projects)* |
+| **Pull Request** | https://github.com/DanielaLTM2206/tienda-microservicios/pull/25 |
+| **Tarjeta Kanban** | https://github.com/users/DanielaLTM2206/projects/1/views/8 |
 | **¿Hiciste el Paso 0?** | No — la actividad F no requiere Paso 0. No necesita JWT ni Sentry. |
 
 ---

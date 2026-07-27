@@ -580,5 +580,5 @@ Implementé un helper `withRetry()` que añade **timeout configurable (3000 ms, 
 | Evidencia después | [`docs/examen/jeffrey2206/despues-con-resiliencia.md`](docs/examen/jeffrey2206/despues-con-resiliencia.md) |
 | Helper de resiliencia | [`apps/pedidos/src/pedidos/resiliencia.helper.ts`](apps/pedidos/src/pedidos/resiliencia.helper.ts) |
 | Prueba automatizada | [`apps/pedidos/src/pedidos/resiliencia.helper.spec.ts`](apps/pedidos/src/pedidos/resiliencia.helper.spec.ts) |
-| Pull Request | *(enlace al PR — completar tras push)* |
+| Pull Request | https://github.com/DanielaLTM2206/tienda-microservicios/pull/25 |
 | Tag | `examen-jeffrey2206` |
