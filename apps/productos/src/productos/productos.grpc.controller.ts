@@ -27,14 +27,14 @@ export class ProductosGrpcController {
    */
   @GrpcMethod('ProductosService', 'ObtenerProducto')
   async obtenerProducto(data: { id: number }) {
-    this.logger.log(`🟣 [gRPC] ObtenerProducto id=${data.id}`);
+    this.logger.log(`[gRPC] ObtenerProducto id=${data.id}`);
 
     try {
       const producto = await this.productosService.findOne(data.id);
 
       if (!producto) {
         // Error controlado: producto no encontrado → no tumba el servicio
-        this.logger.warn(`⚠️  [gRPC] Producto id=${data.id} no encontrado (error controlado)`);
+        this.logger.warn(`[gRPC] Producto id=${data.id} no encontrado (error controlado)`);
         return {
           id: 0,
           nombre: '',
@@ -45,7 +45,7 @@ export class ProductosGrpcController {
         };
       }
 
-      this.logger.log(`✅ [gRPC] Producto encontrado: "${producto.nombre}"`);
+      this.logger.log(`[gRPC] Producto encontrado: "${producto.nombre}"`);
       return {
         id: producto.id,
         nombre: producto.nombre,
@@ -56,7 +56,7 @@ export class ProductosGrpcController {
       };
     } catch (err) {
       // Manejo de excepción en capa de servicio — no tumba el microservicio
-      this.logger.error(`❌ [gRPC] Error en ObtenerProducto: ${err.message}`);
+      this.logger.error(`[gRPC] Error en ObtenerProducto: ${err.message}`);
       return {
         id: 0,
         nombre: '',
@@ -73,7 +73,7 @@ export class ProductosGrpcController {
    */
   @GrpcMethod('ProductosService', 'ListarProductos')
   async listarProductos(_data: Record<string, never>) {
-    this.logger.log(`🟣 [gRPC] ListarProductos`);
+    this.logger.log(`[gRPC] ListarProductos`);
 
     try {
       const productos = await this.productosService.findAll();
@@ -88,8 +88,81 @@ export class ProductosGrpcController {
         })),
       };
     } catch (err) {
-      this.logger.error(`❌ [gRPC] Error en ListarProductos: ${err.message}`);
+      this.logger.error(`[gRPC] Error en ListarProductos: ${err.message}`);
       return { productos: [] };
+    }
+  }
+
+  /**
+   * [Examen B] rpc VerificarDisponibilidad — nuevo salto síncrono con contrato.
+   *
+   * Resuelve la consulta: ¿tiene stock este producto y cuál es su precio actual?
+   * Antes no existía este método; svc-pedidos no podía obtener ambos datos en
+   * un único salto gRPC sin duplicar información.
+   *
+   * Errores tipados (no tumba el servicio):
+   *  - id o cantidad <= 0  → INVALID_ARGUMENT
+   *  - producto no existe  → NOT_FOUND
+   *  - fallo de BD         → INTERNAL (capturado en catch)
+   */
+  @GrpcMethod('ProductosService', 'VerificarDisponibilidad')
+  async verificarDisponibilidad(data: { id: number; cantidad: number }) {
+    this.logger.log(
+      `[gRPC] VerificarDisponibilidad id=${data.id}, cantidad=${data.cantidad}`,
+    );
+
+    // Caso borde: argumento inválido → INVALID_ARGUMENT
+    if (!data.id || data.id <= 0 || !data.cantidad || data.cantidad <= 0) {
+      this.logger.warn(
+        `[gRPC] INVALID_ARGUMENT: id=${data.id}, cantidad=${data.cantidad}`,
+      );
+      return {
+        disponible: false,
+        precio: 0,
+        mensaje: 'El id y la cantidad deben ser mayores a cero',
+        codigo_error: 'INVALID_ARGUMENT',
+      };
+    }
+
+    try {
+      const producto = await this.productosService.findOne(data.id);
+
+      // Caso borde: producto no existe → NOT_FOUND
+      if (!producto) {
+        this.logger.warn(
+          `[gRPC] NOT_FOUND: Producto id=${data.id} no existe`,
+        );
+        return {
+          disponible: false,
+          precio: 0,
+          mensaje: `Producto con id=${data.id} no existe en el catálogo`,
+          codigo_error: 'NOT_FOUND',
+        };
+      }
+
+      // Caso principal: producto encontrado — devuelve disponibilidad y precio
+      this.logger.log(
+        `[gRPC] Verificacion ok: "${producto.nombre}" disponible=${producto.disponible}`,
+      );
+      return {
+        disponible: producto.disponible,
+        precio: Number(producto.precio),
+        mensaje: producto.disponible
+          ? `Producto "${producto.nombre}" disponible`
+          : `Producto "${producto.nombre}" no disponible (sin stock)`,
+        codigo_error: '',
+      };
+    } catch (err) {
+      // Error de infraestructura controlado — no tumba el servicio
+      this.logger.error(
+        `[gRPC] Error en VerificarDisponibilidad: ${err.message}`,
+      );
+      return {
+        disponible: false,
+        precio: 0,
+        mensaje: `Error interno: ${err.message}`,
+        codigo_error: 'INTERNAL',
+      };
     }
   }
 }
