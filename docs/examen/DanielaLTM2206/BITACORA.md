@@ -22,7 +22,12 @@
 
 Añadí el método `VerificarDisponibilidad` al contrato gRPC existente en `libs/proto/productos.proto`. Antes, `svc-pedidos` no podía consultar en un solo salto si un producto tenía stock y cuál era su precio actualizado; esa información estaba atrapada en `svc-productos` sin un método que la expusiera de forma tipada.
 
-Implementé el handler en el servidor (`svc-productos`) con validación de entrada y errores tipados (`NOT_FOUND`, `INVALID_ARGUMENT`). Luego lo consumí desde `svc-pedidos` con mapeo explícito de esos errores al código HTTP correcto en el Gateway: 404 para recurso inexistente, 400 para argumento inválido, 503 si el servicio está caído. El caso feliz devuelve disponibilidad y precio en un único salto sin duplicar datos.
+Implementé los siguientes cambios exactos:
+1. **`libs/proto/productos.proto`**: Nuevo `message VerificarRequest`, `VerificarResponse` y `rpc VerificarDisponibilidad`.
+2. **`apps/productos/src/productos/productos.grpc.controller.ts`**: Handler `@GrpcMethod` que devuelve `NOT_FOUND` si el producto no existe o `INVALID_ARGUMENT` si hay error en los parámetros.
+3. **`apps/pedidos/src/pedidos/pedidos.service.ts`**: Nuevo método consumidor `verificarDisponibilidadGrpc` que mapea el error de gRPC al código HTTP (`RpcException` 404/400).
+4. **`apps/gateway/src/pedidos/pedidos.controller.ts`**: Nuevo endpoint `GET /pedidos/verificar/:id` expuesto vía HTTP.
+5. **`apps/pedidos/src/pedidos/pedidos.verificar.spec.ts`**: Prueba unitaria de 3 casos para el mapeo de errores.
 
 ---
 
@@ -117,21 +122,20 @@ El asistente propuso un import de `RpcException` desde `@nestjs/microservices` p
 
 **Cómo reproducir mi cambio desde cero:**
 
-```bash
+```powershell
 # 1. Levantar el sistema
 docker-compose up -d
 
 # 2. Esperar ~15s a que todos los servicios estén listos
-# Verificar logs: docker-compose logs -f gateway
 
 # 3. Caso exitoso — producto existente
-curl -s "http://localhost:3000/pedidos/verificar/1?cantidad=2" | jq .
+Invoke-RestMethod -Uri "http://localhost:3000/api/pedidos/verificar/1?cantidad=2" | ConvertTo-Json
 
 # 4. Caso NOT_FOUND → 404
-curl -si "http://localhost:3000/pedidos/verificar/999?cantidad=1"
+try { Invoke-RestMethod -Uri "http://localhost:3000/api/pedidos/verificar/999?cantidad=1" } catch { $_.Exception.Response }
 
 # 5. Caso INVALID_ARGUMENT → 400
-curl -si "http://localhost:3000/pedidos/verificar/0?cantidad=0"
+try { Invoke-RestMethod -Uri "http://localhost:3000/api/pedidos/verificar/0?cantidad=0" } catch { $_.Exception.Response }
 ```
 
 ---
