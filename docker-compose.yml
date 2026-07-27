@@ -101,6 +101,7 @@ services:
       REDIS_PORT: 6379
       SVC_PRODUCTOS_HOST: ms-productos
       SVC_PRODUCTOS_PORT: 3002
+      GRPC_PRODUCTOS_URL: ms-productos:5000
     depends_on:
       db:
         condition: service_healthy

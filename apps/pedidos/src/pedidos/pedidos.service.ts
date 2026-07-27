@@ -25,7 +25,8 @@ interface ProductosGrpcService {
     disponible: boolean;
     precio: number;
     mensaje: string;
-    codigo_error: string;
+    codigo_error?: string;
+    codigoError?: string;
   }>;
 }
 
@@ -352,8 +353,12 @@ export class PedidosService implements OnModuleInit {
           ),
       );
 
-      // Traducir codigo de error del contrato al codigo HTTP correcto
-      if (respuesta.codigo_error === 'NOT_FOUND') {
+      this.logger.debug(`[gRPC] RAW RESPUESTA: ${JSON.stringify(respuesta)}`);
+
+      // grpc-js por defecto convierte snake_case (codigo_error) a camelCase (codigoError)
+      const errCode = respuesta.codigoError || respuesta.codigo_error;
+
+      if (errCode === 'NOT_FOUND') {
         this.logger.warn(`[gRPC] NOT_FOUND → 404: ${respuesta.mensaje}`);
         throw new RpcException({
           statusCode: 404,
@@ -362,7 +367,7 @@ export class PedidosService implements OnModuleInit {
         });
       }
 
-      if (respuesta.codigo_error === 'INVALID_ARGUMENT') {
+      if (errCode === 'INVALID_ARGUMENT') {
         this.logger.warn(`[gRPC] INVALID_ARGUMENT → 400: ${respuesta.mensaje}`);
         throw new RpcException({
           statusCode: 400,
