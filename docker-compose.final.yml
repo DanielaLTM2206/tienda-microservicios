@@ -151,6 +151,11 @@ services:
       # svc-pedidos escucha TCP en 3001, no en 3000
       SVC_PEDIDOS_HOST: svc-pedidos
       SVC_PEDIDOS_PORT: "3001"
+      # Examen (Actividad A): el Gateway necesita Redis para la lista de
+      # tokens JWT revocados. Se reutiliza la misma instancia que ya usan
+      # svc-pedidos y svc-notificaciones, sin agregar infraestructura nueva.
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
       JWT_SECRET: ${JWT_SECRET:-cambienme_por_un_secreto}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
       SENTRY_DSN: ${SENTRY_DSN:-}
@@ -159,6 +164,8 @@ services:
     depends_on:
       svc-pedidos:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
