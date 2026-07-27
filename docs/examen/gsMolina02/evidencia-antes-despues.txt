@@ -1,0 +1,74 @@
+=============================================================================
+ ENTREGABLE 5 — Evidencia de ejecucion real: caso ANTES y DESPUES
+ Actividad A — Revocacion de sesion JWT · Stiven Molina (@gsMolina02)
+=============================================================================
+
+Ejecutado el 27/07/2026 sobre el sistema levantado con:
+    docker compose -f docker-compose.final.yml up -d --build
+
+El token se obtiene una sola vez y se reutiliza en las TRES peticiones.
+Lo unico que ocurre entre la primera y la ultima es el logout.
+
+    $login = Invoke-RestMethod -Uri http://localhost:3000/api/auth/login `
+             -Method Post -ContentType "application/json" `
+             -Body '{"username":"admin","password":"admin123"}'
+    $T = $login.access_token
+    # Token OK (largo: 243)
+
+
+========== 5.1  ANTES DEL LOGOUT ==========
+GET /api/pedidos  con el token
+  --> HTTP 200
+
+
+========== LOGOUT ==========
+POST /api/auth/logout
+{"mensaje":"Sesion cerrada. El token presentado ya no es valido.",
+ "jti":"429514be-a37e-4f34-92a0-049a3d2ec565",
+ "revocado_por_segundos":3581}
+
+
+========== 5.2  DESPUES DEL LOGOUT ==========
+GET /api/pedidos  -- MISMA peticion, MISMO token
+  --> HTTP 401
+{"statusCode":401,
+ "message":"Sesion cerrada: este token fue revocado mediante logout",
+ "path":"/api/pedidos",
+ "timestamp":"2026-07-27T12:48:22.496Z"}
+
+
+LECTURA DEL RESULTADO
+---------------------
+El mismo token, en la misma ruta, pasa de 200 a 401 sin que el cliente
+haya hecho nada mas que solicitar el logout. Esa es la diferencia entre
+un logout real (el servidor deja de aceptar la sesion) y borrar el token
+en el navegador (el servidor nunca se entera).
+
+Detalles verificables en la salida:
+
+  - `jti` 429514be-... es el identificador de sesion que viaja dentro del
+    token y que se registro en la lista de revocados.
+
+  - `revocado_por_segundos: 3581` es el TTL de la entrada en Redis: el
+    tiempo que le quedaba de vida al token (1h menos los ~19s
+    transcurridos desde el login). Pasado ese plazo la entrada se borra
+    sola, porque el token ya no es valido por su propio `exp`.
+
+  - El mensaje del 401 dice "revocado mediante logout", distinguible del
+    "la firma del token JWT no es valida" que devuelve un token corrupto
+    o del "el token JWT expiro" de uno vencido. El cliente puede
+    diferenciar los tres casos y actuar en consecuencia.
+
+
+NOTA SOBRE UN INTENTO PREVIO FALLIDO
+------------------------------------
+En un primer intento el token viajo vacio, porque PowerShell 5.1 altera
+las comillas dobles al pasar un JSON a curl.exe y el login fallaba. El
+sistema respondio correctamente en ese escenario:
+
+    POST /api/auth/logout  (sin token)
+    --> 401 {"message":"No autorizado: No auth token"}
+
+Es decir, el guard bloqueo una revocacion anonima. Fue accidental, pero
+confirma el caso borde 1 de la actividad: un anonimo no puede revocar.
+El caso reproducible a proposito esta en despues-casos-borde.txt.

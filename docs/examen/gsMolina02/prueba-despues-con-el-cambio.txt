@@ -1,0 +1,56 @@
+=============================================================================
+ ENTREGABLE 4 — La prueba PASA con mi cambio
+ Actividad A — Revocacion de sesion JWT · Stiven Molina (@gsMolina02)
+=============================================================================
+
+ARCHIVO DE LA PRUEBA
+--------------------
+apps/gateway/src/auth/guards/jwt-auth.guard.spec.ts
+
+COMANDO
+-------
+$ npm test -w gateway
+
+SALIDA
+------
+[Nest] WARN [JwtAuthGuard] 401 - token revocado jti=jti-123
+[Nest] WARN [JwtAuthGuard] 401 - token revocado jti=jti-123
+[Nest] WARN [JwtAuthGuard] 401 - token valido pero sin claim jti (token antiguo)
+
+PASS src/auth/guards/jwt-auth.guard.spec.ts
+  JwtAuthGuard — revocacion de sesion (Actividad A)
+    √ RECHAZA con 401 un token cuyo jti fue revocado (29 ms)
+    √ el mensaje del 401 distingue "revocado" de "token invalido o expirado" (3 ms)
+    √ ACEPTA un token vigente cuyo jti NO fue revocado (2 ms)
+    √ NO consulta la lista en rutas marcadas con @Public() (3 ms)
+    √ RECHAZA un token valido pero sin claim jti (emitido antes del cambio) (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        3.236 s
+Ran all test suites.
+
+QUE VERIFICA CADA CASO
+----------------------
+1. Token revocado          -> el guard lanza 401 en vez de dejar pasar
+2. Mensaje distinguible    -> el 401 dice "revocado", no "invalido o expirado",
+                              para que el cliente sepa que debe reautenticarse
+                              y no que su token esta corrupto
+3. Token no revocado       -> sigue pasando (no rompi el camino feliz)
+4. Ruta @Public()          -> ni siquiera consulta Redis (login y health
+                              siguen accesibles sin token)
+5. Token sin claim jti     -> se rechaza en vez de asumir sesion viva
+                              (tokens emitidos antes de este cambio)
+
+Los casos 3 y 4 son la red de seguridad: prueban que el comportamiento
+anterior del guard sigue intacto.
+
+AISLAMIENTO DE LA PRUEBA
+------------------------
+Se espia el prototipo de AuthGuard('jwt') para simular que Passport ya
+valido firma y expiracion. Asi la prueba mide UNICAMENTE el paso nuevo
+(la consulta a la lista de revocados) y no depende de que haya un Redis
+levantado ni de un token real firmado.
+
+Ver la salida sin el cambio en: prueba-antes-sin-el-cambio.txt

@@ -88,49 +88,88 @@ Usé **Claude (Claude Code)** durante el examen y también durante la preparaci�
 
 | # | Qué le pedí | Qué me devolvió | Qué corregí, adapté o descarté — y por qué |
 |:--:|---|---|---|
-| 1 | Analizar `ACTIVIDADES.md` y `ASIGNACION.md` y decirme qué actividad me tocaba y qué faltaba en el repo | Confirmó la Actividad A verificando la fórmula `((6+2−2) mod 6)+1 = 1`, y detectó que el gateway **no tenía cliente Redis** ni recibía `REDIS_HOST` en el compose | Acepté el diagnóstico tras comprobarlo yo: `grep ioredis apps/gateway/package.json` no devolvía nada. Era información correcta y me ahorró descubrirlo a mitad de la implementación. |
+| 1 | Le pedí que revisara el proyecto y me ayudara a situar mi actividad: cuál me tocaba y qué le faltaba al repositorio para poder hacerla | Confirmó la Actividad A aplicando la fórmula `((6+2−2) mod 6)+1 = 1`; señaló que el gateway **no tenía cliente Redis** ni recibía `REDIS_HOST` en el compose; y advirtió que el Paso 0 no me aplicaba porque la base de JWT ya existía del Avance 3 | Contrasté la fórmula con el orden alfabético real de mi grupo (Manobanda, Molina, Tituaña → soy P=2) y el diagnóstico de Redis con `grep ioredis apps/gateway/package.json`, que efectivamente no devolvía nada. Lo de Redis fue lo que más me sirvió: era un requisito de infraestructura que no había anticipado y que condicionaba toda la implementación. |
 | 2 | Implementar la revocación extendiendo el guard existente | Servicio de revocación en Redis, `POST /auth/logout`, `jti` en el payload y la extensión de `canActivate` | Revisé que **no creara un guard nuevo** (habría violado el anclaje obligatorio). Verifiqué el orden de los pasos: primero firma, después lista de revocados, para no permitir que un anónimo genere consultas a Redis con tokens falsos. |
-| 3 | Una prueba automatizada que falle sin el cambio | Test con `jest` que espía el prototipo de `AuthGuard('jwt')` para aislar el paso nuevo | Verifiqué que la prueba realmente falla contra el guard anterior: sin la comprobación de revocados, `canActivate` devolvía `true` y el caso "rechaza token revocado" no lanzaba. También comprobé que el repo no tenía jest y hubo que configurarlo desde cero. |
+| 3 | Una prueba automatizada que falle sin el cambio | Test con `jest` que espía el prototipo de `AuthGuard('jwt')` para aislar el paso nuevo | No me bastó con que lo afirmara: revertí `canActivate` a su versión previa y ejecuté la suite yo mismo para verlo fallar. También comprobé que el repo no tenía jest y hubo que configurarlo desde cero. Descarté su primera propuesta de revertir el guard **entero**: como el constructor cambió (ahora recibe `TokenRevocationService`), la prueba ni siquiera compilaría y la evidencia sería un error de TypeScript en vez de fallos de aserción legibles. |
+| 4 | Comandos de PowerShell para capturar la evidencia antes/después | Un bloque que pasaba el JSON del login a `curl.exe` con `-d '{"username":...}'` | **Falló en mi máquina.** PowerShell 5.1 altera las comillas dobles al pasarlas a un ejecutable nativo, así que el login recibía JSON inválido, devolvía 401 y el token quedaba vacío — la evidencia salía toda en 401. Lo detecté porque el "antes" daba 401 cuando debía dar 200. La solución fue usar `Invoke-RestMethod` para el login, que serializa el cuerpo de forma nativa, y dejar `curl.exe` solo para las peticiones con cabecera. |
 
 **¿En qué se equivocó respecto a mi repositorio?**
 
-Se equivocó de forma concreta y comprobable durante la preparación del Avance 3. Cuando Daniela añadió `bcrypt` al gateway, Claude afirmó que **fallaría al compilar en Alpine** por ser un módulo nativo que requiere `python3`, `make` y `g++`, y recomendó sustituirlo por `bcryptjs`. Lo detecté porque no acepté la afirmación sin probarla: ejecuté `docker build -f apps/gateway/Dockerfile -t test-gateway .` y el build pasó, y después `docker run --rm test-gateway node -e "require('bcrypt')..."`, que devolvió `bcrypt OK -> true`. La advertencia era incorrecta — `bcrypt` v6 ya distribuye binarios precompilados para musl — y de haberla seguido habría cambiado una dependencia sin motivo.
+**Caso 1 — durante el examen: ignoró mi entorno real (Windows / PowerShell 5.1).**
+Me dio un bloque de comandos para capturar la evidencia que pasaba el JSON del login a `curl.exe` con `-d '{"username":"admin","password":"admin123"}'`. En Linux o en bash eso funciona; en PowerShell 5.1 no, porque altera las comillas dobles al pasarlas a un ejecutable nativo. El login recibía JSON inválido, devolvía 401, y `$T` quedaba vacío. El resultado fue que **la evidencia salió con 401 en el "antes"**, donde debía salir 200:
 
-También comprobé que sus afirmaciones sobre el estado del repo eran a veces de segunda mano: cuando dijo que `docker-compose.final.yml` estaba roto, verifiqué cada punto contra el archivo antes de aceptarlo. El patrón que apliqué durante todo el examen fue no dar por buena ninguna afirmación sobre mi repositorio sin un comando que la respaldara.
+```
+========== 5.1  ANTES DEL LOGOUT ==========
+  --> HTTP 401
+{"statusCode":401,"message":"No autorizado: No auth token", ...}
+```
+
+Lo detecté precisamente porque conocía el comportamiento esperado de mi propio sistema: sabía que un token válido debía dar 200 ahí, así que el 401 solo podía significar que el token no estaba llegando. La corrección fue usar `Invoke-RestMethod` para el login y verificar el token (`$T.Length` → 243) **antes** de continuar, en vez de asumir que la cadena de comandos había funcionado.
+
+Como efecto lateral, ese fallo confirmó de forma accidental el caso borde 1 de mi actividad: el `POST /auth/logout` sin token devolvió 401, es decir, el guard bloqueó una revocación anónima.
+
+**Caso 2 — durante la preparación del Avance 3: una advertencia falsa sobre `bcrypt`.**
+Cuando Daniela añadió `bcrypt` al gateway, Claude afirmó que **fallaría al compilar en Alpine** por ser un módulo nativo que requiere `python3`, `make` y `g++`, y recomendó sustituirlo por `bcryptjs`. No acepté la afirmación sin probarla: ejecuté `docker build -f apps/gateway/Dockerfile -t test-gateway .` y el build pasó, y después `docker run --rm test-gateway node -e "require('bcrypt')..."`, que devolvió `bcrypt OK -> true`. La advertencia era incorrecta — `bcrypt` v6 ya distribuye binarios precompilados para musl — y de haberla seguido habría cambiado una dependencia sin ningún motivo.
+
+**El patrón que apliqué en todo el examen** fue no dar por buena ninguna afirmación sobre mi repositorio sin un comando que la respaldara. Cuando dijo que `docker-compose.final.yml` estaba roto, verifiqué cada punto contra el archivo. Cuando dijo que la prueba fallaría sin mi cambio, la ejecuté yo mismo contra el guard anterior en vez de citarlo de palabra.
 
 ---
 
 ## 6. Evidencia
 
+**Caso antes y después (entregable 5):**
+
 | Archivo | Qué demuestra |
 |---|---|
-| `antes-ruta-protegida-200.txt` | `GET /api/pedidos` con el token → **200 OK**, antes de revocar |
+| `evidencia-antes-despues.png` | **Captura única con el antes y el después en la misma sesión de terminal**: el mismo token pasa de 200 a 401 tras el logout. Una sola imagen evita la duda de si se usó otro token en la segunda petición |
+| `evidencia-antes-despues.txt` | La misma secuencia en texto, con la lectura del `jti`, del TTL y del mensaje del 401 |
+| `antes-ruta-protegida-200.txt` | `GET /api/pedidos` con el token → **200 OK**, antes de revocar (salida completa de `curl -i`) |
 | `despues-logout-200.txt` | `POST /api/auth/logout` → **200** con el `jti` revocado y su TTL |
 | `despues-ruta-protegida-401.txt` | **La misma petición con el mismo token** → **401 "Sesion cerrada: este token fue revocado mediante logout"** |
 | `despues-casos-borde.txt` | Los tres casos borde: logout sin token → 401; logout dos veces → sin caída; token de otro usuario → sigue en 200. Incluye la clave en Redis y su TTL decreciendo |
 
+**Prueba automatizada (entregable 4):**
+
+| Archivo | Qué demuestra |
+|---|---|
+| `prueba-antes-sin-el-cambio.png` / `.txt` | La suite contra el guard **anterior**: 3 fallos, 2 pasan. Los 3 que fallan son exactamente los del comportamiento nuevo |
+| `prueba-despues-con-el-cambio.png` / `.txt` | La misma suite con el cambio aplicado: **5 de 5 pasando** |
+
 **Cómo reproducir mi cambio desde cero:**
 
-```bash
+Es el procedimiento que usé realmente, en **PowerShell sobre Windows**. El login va con `Invoke-RestMethod` y no con `curl.exe` por el problema de comillas descrito en la sección 5.
+
+```powershell
 git checkout exam/gsMolina02
 docker compose -f docker-compose.final.yml up -d --build
 
-# 1. Login (el token ya trae jti)
-TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}' | jq -r .access_token)
+# 1. Login — el token ya trae jti
+$login = Invoke-RestMethod -Uri http://localhost:3000/api/auth/login `
+         -Method Post -ContentType "application/json" `
+         -Body '{"username":"admin","password":"admin123"}'
+$T = $login.access_token
+if (-not $T) { Write-Host "ERROR: token vacio" -ForegroundColor Red }
 
 # 2. ANTES: la ruta protegida responde 200
-curl -i http://localhost:3000/api/pedidos -H "Authorization: Bearer $TOKEN"
+curl.exe -s -o NUL -w "  --> HTTP %{http_code}`n" http://localhost:3000/api/pedidos -H "Authorization: Bearer $T"
 
 # 3. Cerrar sesion
-curl -i -X POST http://localhost:3000/api/auth/logout -H "Authorization: Bearer $TOKEN"
+curl.exe -s -X POST http://localhost:3000/api/auth/logout -H "Authorization: Bearer $T"
 
 # 4. DESPUES: la MISMA peticion con el MISMO token -> 401 revocado
-curl -i http://localhost:3000/api/pedidos -H "Authorization: Bearer $TOKEN"
+curl.exe -s -o NUL -w "  --> HTTP %{http_code}`n" http://localhost:3000/api/pedidos -H "Authorization: Bearer $T"
+curl.exe -s http://localhost:3000/api/pedidos -H "Authorization: Bearer $T"
 
 # 5. La clave y su TTL en Redis
 docker exec ms-redis redis-cli --scan --pattern 'jwt:revocado:*'
+```
+
+En bash el paso 1 equivale a:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' | jq -r .access_token)
 ```
 
 ---
@@ -142,20 +181,47 @@ docker exec ms-redis redis-cli --scan --pattern 'jwt:revocado:*'
 | **Archivo de la prueba** | `apps/gateway/src/auth/guards/jwt-auth.guard.spec.ts` |
 | **Comando para ejecutarla** | `npm test -w gateway` |
 | **Qué verifica** | Que el guard rechaza con 401 un token cuyo `jti` está revocado, que acepta uno que no lo está, que el mensaje distingue "revocado" de "inválido/expirado", que las rutas `@Public()` no consultan la lista, y que un token sin `jti` se rechaza |
-| **¿Falla sin mi cambio?** | **Sí.** El guard anterior solo delegaba en `super.canActivate()`: con la firma válida devolvía `true` siempre, sin mirar la lista. Lo comprobé revirtiendo `canActivate` a su versión previa (commit `73ef172`): el caso "RECHAZA con 401 un token cuyo jti fue revocado" pasa a devolver `true` en vez de lanzar, y la suite falla. |
+| **¿Falla sin mi cambio?** | **Sí — verificado ejecutándolo, no de palabra.** Restauré el comportamiento del guard anterior (retorno anticipado justo después del paso de Passport, que es lo que hacía el commit `73ef172`) y ejecuté la misma suite sin tocarla: **3 fallan, 2 pasan**. Los 3 que fallan son exactamente los del comportamiento nuevo; los 2 que pasan describen comportamiento que ya existía y que mi cambio no debía romper. |
+
+**Salida SIN mi cambio** (guard anterior) — 3 fallos:
+
+```
+ FAIL  src/auth/guards/jwt-auth.guard.spec.ts
+    × RECHAZA con 401 un token cuyo jti fue revocado (3 ms)
+    × el mensaje del 401 distingue "revocado" de "token invalido o expirado"
+    √ ACEPTA un token vigente cuyo jti NO fue revocado
+    √ NO consulta la lista en rutas marcadas con @Public() (1 ms)
+    × RECHAZA un token valido pero sin claim jti (emitido antes del cambio)
+
+  ● RECHAZA con 401 un token cuyo jti fue revocado
+
+    expect(received).rejects.toThrow()
+
+    Received promise resolved instead of rejected
+    Resolved to value: true
+
+    > 56 |     await expect(guard.canActivate(contextoFalso())).rejects.toThrow(
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 2 passed, 5 total
+```
+
+El mensaje `Resolved to value: true` es la prueba textual del problema que resolví: el guard anterior **dejaba pasar** (devolvía `true`) un token revocado, donde ahora lanza `UnauthorizedException`.
+
+**Salida CON mi cambio** — 5 de 5:
 
 ```
 PASS src/auth/guards/jwt-auth.guard.spec.ts
   JwtAuthGuard — revocacion de sesion (Actividad A)
-    √ RECHAZA con 401 un token cuyo jti fue revocado (29 ms)
-    √ el mensaje del 401 distingue "revocado" de "token invalido o expirado" (3 ms)
-    √ ACEPTA un token vigente cuyo jti NO fue revocado (2 ms)
-    √ NO consulta la lista en rutas marcadas con @Public() (3 ms)
-    √ RECHAZA un token valido pero sin claim jti (emitido antes del cambio) (2 ms)
+    √ RECHAZA con 401 un token cuyo jti fue revocado (8 ms)
+    √ el mensaje del 401 distingue "revocado" de "token invalido o expirado" (1 ms)
+    √ ACEPTA un token vigente cuyo jti NO fue revocado
+    √ NO consulta la lista en rutas marcadas con @Public() (1 ms)
+    √ RECHAZA un token valido pero sin claim jti (emitido antes del cambio)
 
 Test Suites: 1 passed, 1 total
 Tests:       5 passed, 5 total
-Time:        3.236 s
+Time:        1.765 s
 ```
 
 ---
@@ -163,12 +229,13 @@ Time:        3.236 s
 ## 8. Estado final — honesto
 
 **Funciona:**
-- `jti` único en cada token emitido, verificado decodificando el payload.
-- `POST /api/auth/logout` protegido, que revoca solo la sesión presentada.
-- El guard existente rechaza tokens revocados con 401 y mensaje distinguible.
-- TTL alineado con `exp`, verificado en Redis (3586 s → 3573 s).
-- Los tres casos borde de la actividad.
-- 5 pruebas automatizadas pasando.
+- `jti` único en cada token emitido, verificado decodificando el payload (ej. `429514be-a37e-4f34-92a0-049a3d2ec565`).
+- `POST /api/auth/logout` protegido, que revoca **solo** la sesión presentada.
+- El guard existente rechaza tokens revocados con 401 y un mensaje distinguible del de token inválido o expirado.
+- **Caso principal verificado de extremo a extremo:** el mismo token, en la misma ruta, pasa de **200 → 401** tras el logout, sin que el cliente haga nada más.
+- TTL alineado con `exp`, verificado en Redis (3586 s → 3573 s en consultas sucesivas; 3581 s en la ejecución final).
+- Los tres casos borde de la actividad: logout sin token → 401; logout dos veces → sin caída; token vigente de otro usuario → sigue en 200.
+- 5 pruebas automatizadas pasando, y verificado que 3 de ellas fallan contra el guard anterior.
 
 **No funciona / quedó incompleto:**
 - La política de fallo cerrado ante caída de Redis **está implementada pero no la probé en vivo** apagando el contenedor de Redis. El comportamiento está razonado y cubierto por el `try/catch`, pero no tengo evidencia de ejecución de ese caso concreto.

@@ -1,0 +1,61 @@
+=============================================================================
+ ENTREGABLE 4 — La prueba FALLA sin mi cambio
+ Actividad A — Revocacion de sesion JWT · Stiven Molina (@gsMolina02)
+=============================================================================
+
+COMO SE OBTUVO ESTA SALIDA
+--------------------------
+Se revirtio JwtAuthGuard.canActivate() a su version previa al examen
+(la del commit 73ef172 del Avance 3), que solo delegaba en Passport:
+
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+      const esPublica = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (esPublica) return true;
+      return (await super.canActivate(context)) as boolean;
+    }
+
+Con la firma valida devolvia `true` SIEMPRE, sin consultar la lista de
+revocados. Despues se ejecuto la misma suite de pruebas sin modificarla.
+
+COMANDO
+-------
+$ npm test -w gateway
+
+SALIDA
+------
+    × RECHAZA con 401 un token cuyo jti fue revocado (2 ms)
+    × el mensaje del 401 distingue "revocado" de "token invalido o expirado"
+    √ ACEPTA un token vigente cuyo jti NO fue revocado
+    √ NO consulta la lista en rutas marcadas con @Public() (1 ms)
+    × RECHAZA un token valido pero sin claim jti (emitido antes del cambio)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 2 passed, 5 total
+
+npm error Lifecycle script `test` failed with error:
+npm error command failed
+
+LECTURA DEL RESULTADO
+---------------------
+Fallan los 3 casos que dependen del comportamiento nuevo:
+
+  × "RECHAZA con 401 un token cuyo jti fue revocado"
+        el guard antiguo devolvia true en vez de lanzar UnauthorizedException
+
+  × "el mensaje del 401 distingue revocado de invalido/expirado"
+        no habia tal mensaje porque no habia comprobacion de revocacion
+
+  × "RECHAZA un token valido pero sin claim jti"
+        el guard antiguo no miraba el claim jti
+
+Pasan los 2 que describen comportamiento que YA existia y que mi cambio
+no debia romper: aceptar un token vigente, y no consultar la lista en las
+rutas marcadas con @Public().
+
+Es decir: la prueba no solo falla sin el cambio, sino que falla
+EXACTAMENTE en los casos que el cambio introduce.
+
+Ver la salida con el cambio aplicado en: prueba-despues-con-el-cambio.txt
