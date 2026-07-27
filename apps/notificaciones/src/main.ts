@@ -31,6 +31,12 @@ async function bootstrap() {
     },
   });
 
+  // init() dispara los hooks de ciclo de vida (onModuleInit → suscripcion a Redis).
+  // Sin esto el camino Redis del Avance 1 queda MUERTO: connectMicroservice() marca
+  // el microservicio como isInitialized/isInitHookCalled = true, asi que el listen()
+  // de startAllMicroservices() se salta registerModules() y nunca llama callInitHook().
+  // Es el mismo arranque que ya se corrigio en svc-productos (donde rompia el seed).
+  await app.init();
   await app.startAllMicroservices();
   console.log('🟢 svc-notificaciones iniciado');
   console.log('   📡 Redis SUB → canal: eventos:notificaciones (Avance 1)');

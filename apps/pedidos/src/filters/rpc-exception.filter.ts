@@ -3,28 +3,19 @@ import { RpcException } from '@nestjs/microservices';
 import { throwError, Observable } from 'rxjs';
 
 /**
- * RpcExceptionFilter — Estrategia de manejo de excepciones para la capa RPC.
+ * AllRpcExceptionsFilter — UNICO filtro de la capa RPC de svc-pedidos.
  *
- * Principio SRP: centraliza el manejo de errores, separándolo del flujo de negocio.
- * Patrón: Exception Filter (NestJS) — captura errores no controlados en los handlers TCP.
+ * Patrón: Exception Filter (NestJS). Principio SRP: centraliza el manejo de
+ * errores y lo separa del flujo de negocio.
  *
- * Este filter evita que una excepción no manejada tumbe el microservicio,
- * retornando un error estructurado al llamador.
- */
-@Catch(RpcException)
-export class RpcExceptionFilter implements NestRpcExceptionFilter<RpcException> {
-  private readonly logger = new Logger(RpcExceptionFilter.name);
-
-  catch(exception: RpcException, host: ArgumentsHost): Observable<any> {
-    const error = exception.getError();
-    this.logger.error(`[RpcExceptionFilter] Error capturado: ${JSON.stringify(error)}`);
-    return throwError(() => error);
-  }
-}
-
-/**
- * AllRpcExceptionsFilter — captura CUALQUIER excepción (no solo RpcException).
- * Se aplica globalmente en svc-pedidos para garantizar que ningún error tumbe el servicio.
+ * Decisión de diseño: un solo filtro con @Catch() (sin argumentos) en lugar de
+ * dos filtros (uno @Catch(RpcException) + uno genérico). @Catch() ya recibe TODA
+ * excepción, y dentro se distingue el caso RpcException del Error inesperado.
+ * Un segundo filtro específico seria codigo muerto: nunca se registraria porque
+ * este ya cubre el mismo caso, y Nest aplica el primero que coincide.
+ *
+ * Se registra globalmente en main.ts, de modo que ninguna excepción tumbe el
+ * microservicio y el llamador siempre reciba { statusCode, message, ... }.
  */
 @Catch()
 export class AllRpcExceptionsFilter implements NestRpcExceptionFilter<Error> {
