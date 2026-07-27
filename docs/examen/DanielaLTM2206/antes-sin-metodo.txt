@@ -1,0 +1,53 @@
+﻿=== EVIDENCIA ANTES — Actividad B — Examen Final ===
+Fecha: 2026-07-27 07:27:49
+Usuario: DanielaLTM2206
+Rama: exam/DanielaLTM2206
+
+--- Búsqueda de VerificarDisponibilidad en el contrato gRPC ---
+Comando: Select-String -Path libs/proto/productos.proto -Pattern VerificarDisponibilidad
+Resultado: MÉTODO NO EXISTE
+
+--- Contrato actual (libs/proto/productos.proto) ---
+// productos.proto â€” Contrato gRPC del sistema ShopMS
+// Usado por: svc-pedidos (cliente) <-> svc-productos (servidor)
+// Monorepo: libs/proto/productos.proto
+//
+// PatrÃ³n: Contract-First (el contrato define la interfaz antes de implementar)
+// Principio ISP: la interfaz expone solo lo necesario para la comunicaciÃ³n.
+
+syntax = "proto3";
+
+package productos;
+
+// Servicio gRPC que expone operaciones de productos
+service ProductosService {
+  // Obtener un producto por ID (peticiÃ³n-respuesta sÃ­ncrona)
+  rpc ObtenerProducto (ProductoRequest) returns (ProductoResponse);
+
+  // Obtener todos los productos
+  rpc ListarProductos (ListarRequest) returns (ListarResponse);
+}
+
+// Mensaje de solicitud: identificador del producto
+message ProductoRequest {
+  int32 id = 1;
+}
+
+// Mensaje de respuesta: datos del producto
+message ProductoResponse {
+  int32    id         = 1;
+  string   nombre     = 2;
+  double   precio     = 3;
+  bool     disponible = 4;
+  bool     encontrado = 5; // false si el producto no existe (error controlado)
+  string   error      = 6; // descripciÃ³n del error si encontrado=false
+}
+
+// Mensaje vacÃ­o para listar todos los productos
+message ListarRequest {}
+
+// Lista de productos
+message ListarResponse {
+  repeated ProductoResponse productos = 1;
+}
+
