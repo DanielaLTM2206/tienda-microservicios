@@ -5,6 +5,7 @@ import type { StringValue } from 'ms';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { TokenRevocationService } from './token-revocation.service';
 
 /**
  * AuthModule — Avance 3, Criterio C1.
@@ -34,7 +35,9 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [JwtModule, PassportModule],
+  providers: [AuthService, JwtStrategy, TokenRevocationService],
+  // TokenRevocationService se exporta porque el JwtAuthGuard se registra como
+  // APP_GUARD en AppModule, y Nest resuelve sus dependencias en ese contexto.
+  exports: [JwtModule, PassportModule, TokenRevocationService],
 })
 export class AuthModule {}
