@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
@@ -5,13 +6,25 @@ import { AppModule } from './app.module';
 import { AllRpcExceptionsFilter } from './filters/rpc-exception.filter';
 
 /**
- * svc-productos arranaca con DOS transportes simultáneos:
+ * svc-productos arranca con DOS transportes simultáneos:
  *   1. TCP  :3002 — camino síncrono legado (Avance 1, se conserva)
  *   2. gRPC :5000 — nuevo camino con contrato productos.proto (Avance 2)
  *
  * NestJS permite múltiples transportes mediante connectMicroservice().
  * Patrón: Hybrid Application (HTTP + Microservice).
+ *
+ * Sentry se inicializa ANTES de crear la app para capturar errores de bootstrap.
+ * Sin SENTRY_DSN el bloque se omite — el servicio arranca sin dependencia de Sentry.
  */
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    serverName: 'svc-productos',
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 1.0,
+  });
+}
+
 async function bootstrap() {
   // Crear aplicación híbrida (puede tener múltiples transportes)
   const app = await NestFactory.create(AppModule);
