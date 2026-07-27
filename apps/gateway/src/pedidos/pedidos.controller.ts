@@ -13,6 +13,7 @@ import {
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout, catchError, throwError } from 'rxjs';
 import { CrearPedidoDto } from './dto/crear-pedido.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 /**
  * Patrón: Proxy — el Gateway delega la lógica al microservicio pedidos.
@@ -102,6 +103,10 @@ export class PedidosController {
    * POST /api/pedidos
    * Camino SÍNCRONO: crea un pedido (valida producto TCP, notifica Redis + RabbitMQ)
    */
+  // Autorización por rol (Avance 3, C2): consultar pedidos lo puede hacer
+  // cualquier usuario autenticado, pero CREARLOS es una operación de escritura
+  // reservada a "admin". Un token de "cliente" recibe 403 aquí.
+  @Roles('admin')
   @Post()
   async create(@Body() body: CrearPedidoDto) {
     this.logger.log('[TCP] POST /api/pedidos → svc-pedidos → svc-productos');
