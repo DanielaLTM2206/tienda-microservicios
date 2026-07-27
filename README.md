@@ -900,3 +900,29 @@ Nosotros agregamos: `AllExceptionsFilter` global (con el bug fix de `getResponse
 - `v1-avance1` — Avance 1 completado
 - `v2-avance2` — Avance 2 completado
 - `v3-final` — Avance 3 final (rama `feat/observabilidad-sentry`)
+
+---
+
+### Examen final — Stiven Molina
+
+**Actividad A — Revocación de sesión JWT (logout real).** Rama `exam/gsMolina02` · tag `examen-gsMolina02`
+
+Antes de este cambio, cerrar sesión solo borraba el token en el cliente: el servidor
+lo seguía aceptando hasta que expirara. Ahora cada token lleva un identificador único
+de sesión (`jti`), `POST /api/auth/logout` lo registra en una lista de revocados en
+Redis con TTL igual a la vida restante del token, y el `JwtAuthGuard` que ya protegía
+las rutas lo consulta como segundo paso de validación.
+
+| | |
+|---|---|
+| **Bitácora** | [`docs/examen/gsMolina02/BITACORA.md`](docs/examen/gsMolina02/BITACORA.md) |
+| **Evidencia** | [`docs/examen/gsMolina02/`](docs/examen/gsMolina02/) |
+| **Prueba** | `apps/gateway/src/auth/guards/jwt-auth.guard.spec.ts` — `npm test -w gateway` |
+| **Endpoint nuevo** | `POST /api/auth/logout` (protegido) |
+
+```bash
+# La misma peticion, con el mismo token, antes y despues del logout
+curl -i http://localhost:3000/api/pedidos      -H "Authorization: Bearer $TOKEN"  # 200
+curl -i -X POST http://localhost:3000/api/auth/logout -H "Authorization: Bearer $TOKEN"  # 200
+curl -i http://localhost:3000/api/pedidos      -H "Authorization: Bearer $TOKEN"  # 401 revocado
+```

@@ -1,0 +1,10 @@
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 140
+ETag: W/"8c-fPqgfrNVWgnjUu8sONcCdxUwjvU"
+Date: Mon, 27 Jul 2026 12:28:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"mensaje":"Sesion cerrada. El token presentado ya no es valido.","jti":"0fe61879-6855-41da-abad-853cf2d83bc7","revocado_por_segundos":3586}
