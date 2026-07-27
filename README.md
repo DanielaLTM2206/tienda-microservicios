@@ -900,3 +900,8 @@ Nosotros agregamos: `AllExceptionsFilter` global (con el bug fix de `getResponse
 - `v1-avance1` — Avance 1 completado
 - `v2-avance2` — Avance 2 completado
 - `v3-final` — Avance 3 final (rama `feat/observabilidad-sentry`)
+
+---
+
+### Examen final - DanielaLTM2206
+[Enlace a mi bitácora](docs/examen/DanielaLTM2206/BITACORA.md)

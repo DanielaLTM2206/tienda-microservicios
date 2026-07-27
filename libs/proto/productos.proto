@@ -16,6 +16,9 @@ service ProductosService {
 
   // Obtener todos los productos
   rpc ListarProductos (ListarRequest) returns (ListarResponse);
+
+  // [Examen B] Verificar disponibilidad y precio de un producto en un solo salto
+  rpc VerificarDisponibilidad (VerificarRequest) returns (VerificarResponse);
 }
 
 // Mensaje de solicitud: identificador del producto
@@ -39,4 +42,18 @@ message ListarRequest {}
 // Lista de productos
 message ListarResponse {
   repeated ProductoResponse productos = 1;
+}
+
+// [Examen B] Solicitud de verificación de disponibilidad
+message VerificarRequest {
+  int32 id       = 1;  // ID del producto a verificar
+  int32 cantidad = 2;  // Cantidad que se desea pedir
+}
+
+// [Examen B] Respuesta de disponibilidad con error tipado
+message VerificarResponse {
+  bool   disponible   = 1;  // true si el producto está activo en el catálogo
+  double precio       = 2;  // precio actual del producto
+  string mensaje      = 3;  // descripción del resultado o del error
+  string codigo_error = 4;  // "NOT_FOUND" | "INVALID_ARGUMENT" | "" si ok
 }

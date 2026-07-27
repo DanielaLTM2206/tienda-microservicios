@@ -13,7 +13,7 @@ import { PedidosService } from './pedidos.service';
 export class PedidosController {
   private readonly logger = new Logger(PedidosController.name);
 
-  constructor(private readonly pedidosService: PedidosService) {}
+  constructor(private readonly pedidosService: PedidosService) { }
 
   /**
    * Handler de 1 SALTO para la medición de latencia por salto (C2 rúbrica):
@@ -30,29 +30,29 @@ export class PedidosController {
 
   @MessagePattern({ cmd: 'get_pedidos' })
   async findAll() {
-    this.logger.log('📨 [TCP] Recibido: get_pedidos');
+    this.logger.log('[TCP] Recibido: get_pedidos');
     try {
       return await this.pedidosService.findAll();
     } catch (err) {
-      this.logger.error(`❌ Error en get_pedidos: ${err.message}`);
+      this.logger.error(`Error en get_pedidos: ${err.message}`);
       throw err;
     }
   }
 
   @MessagePattern({ cmd: 'create_pedido' })
   async create(@Payload() data: { productoId: number; cantidad: number }) {
-    this.logger.log(`📨 [TCP] Recibido: create_pedido ${JSON.stringify(data)}`);
+    this.logger.log(`[TCP] Recibido: create_pedido ${JSON.stringify(data)}`);
     try {
       return await this.pedidosService.create(data);
     } catch (err) {
-      this.logger.error(`❌ Error en create_pedido: ${err.message}`);
+      this.logger.error(`Error en create_pedido: ${err.message}`);
       throw err;
     }
   }
 
   @MessagePattern({ cmd: 'publicar_evento' })
   async publicarEvento(@Payload() data: any) {
-    this.logger.log(`📨 [TCP] Recibido: publicar_evento`);
+    this.logger.log(`[TCP] Recibido: publicar_evento`);
     return await this.pedidosService.publicarEvento(data);
   }
 
@@ -65,12 +65,12 @@ export class PedidosController {
    */
   @MessagePattern({ cmd: 'get_producto_grpc' })
   async obtenerProductoGrpc(@Payload() data: { id: number }) {
-    this.logger.log(`📨 [TCP→gRPC] Recibido: get_producto_grpc id=${data.id}`);
+    this.logger.log(`[TCP→gRPC] Recibido: get_producto_grpc id=${data.id}`);
     try {
       return await this.pedidosService.obtenerProductoGrpc(data.id);
     } catch (err) {
       // Manejo de excepción: error controlado que no tumba el servicio
-      this.logger.error(`❌ Error en get_producto_grpc: ${err.message}`);
+      this.logger.error(`Error en get_producto_grpc: ${err.message}`);
       return { ok: false, error: err.message, transporte: 'gRPC' };
     }
   }
@@ -80,12 +80,19 @@ export class PedidosController {
    */
   @MessagePattern({ cmd: 'publicar_stock' })
   async publicarStock(@Payload() data: any) {
-    this.logger.log(`📨 [TCP→RabbitMQ] Recibido: publicar_stock`);
+    this.logger.log(`[TCP→RabbitMQ] Recibido: publicar_stock`);
     try {
       return await this.pedidosService.publicarStockRabbitMQ(data);
     } catch (err) {
-      this.logger.error(`❌ Error en publicar_stock: ${err.message}`);
+      this.logger.error(`Error en publicar_stock: ${err.message}`);
       return { ok: false, error: err.message };
     }
   }
+  // [EXAMEN B] Nuevo handler — salto sincrono con contrato gRPC
+  @MessagePattern({ cmd: 'verificar_disponibilidad' })
+  async verificarDisponibilidad(@Payload() data: { id: number; cantidad: number }) {
+    this.logger.log(`[TCP] verificar_disponibilidad id=${data.id}, cantidad=${data.cantidad}`);
+    return this.pedidosService.verificarDisponibilidadGrpc(data.id, data.cantidad);
+  }
+
 }

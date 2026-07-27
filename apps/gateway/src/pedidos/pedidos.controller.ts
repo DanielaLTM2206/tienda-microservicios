@@ -4,11 +4,13 @@ import {
   Post,
   Body,
   Param,
+  Query,
   Inject,
   HttpException,
   HttpStatus,
   Logger,
   ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout, catchError, throwError } from 'rxjs';
@@ -231,6 +233,46 @@ export class PedidosController {
     } catch (err) {
       if (err instanceof HttpException) throw err;
       throw new HttpException(err.message, HttpStatus.BAD_GATEWAY);
+    }
+  }
+  // ── Examen B (nuevo) ─────────────────────────────────────────────────────
+
+  /**
+   * GET /api/pedidos/verificar/:id?cantidad=N
+   * [Examen B] Nuevo salto sincrono con contrato gRPC.
+   * Flujo: Gateway (HTTP) → svc-pedidos (TCP) → svc-productos (gRPC)
+   *
+   * Errores traducidos al codigo HTTP correcto:
+   *   - Producto inexistente    → 404
+   *   - Argumento invalido      → 400
+   *   - svc-productos caido     → 503
+   */
+  @Get('verificar/:id')
+  async verificarDisponibilidad(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('cantidad', new DefaultValuePipe(1), ParseIntPipe) cantidad: number,
+  ) {
+    this.logger.log(`[gRPC] GET /api/pedidos/verificar/${id}?cantidad=${cantidad}`);
+    try {
+      const result = await firstValueFrom(
+        this.pedidosClient
+          .send({ cmd: 'verificar_disponibilidad' }, { id, cantidad })
+          .pipe(
+            timeout(6000),
+            catchError((err) =>
+              throwError(
+                () => this.rpcAHttp(err, 'Error al verificar disponibilidad'),
+              ),
+            ),
+          ),
+      );
+      return result;
+    } catch (err) {
+      if (err instanceof HttpException) throw err;
+      throw new HttpException(
+        `Error al verificar disponibilidad: ${err.message}`,
+        HttpStatus.BAD_GATEWAY,
+      );
     }
   }
 }
