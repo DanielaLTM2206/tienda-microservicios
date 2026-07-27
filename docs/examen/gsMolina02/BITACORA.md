@@ -46,6 +46,18 @@ Seguí el patrón de cliente `ioredis` que ya usan `PedidosService` y `Notificac
 - **No levanté un Redis propio para el gateway.** Reutilicé el del compose.
 - **No dupliqué la validación de firma.** El paso de Passport se conserva íntegro; solo encadeno el mío después.
 
+**Principios SOLID aplicados en este cambio**
+
+No los menciono como adorno: cada uno explica una decisión concreta de dónde puse el código.
+
+| Principio | Dónde | Qué implica en la práctica |
+|---|---|---|
+| **SRP** — Responsabilidad única | `token-revocation.service.ts` | La clase tiene **una sola razón para cambiar**: cómo se almacenan y consultan las sesiones revocadas. No sabe nada de HTTP, de Passport ni de rutas. Por eso el cálculo del TTL y el manejo del fallo de Redis viven ahí y no dentro del guard. |
+| **DIP** — Inversión de dependencias | `jwt-auth.guard.ts:36` y `auth.controller.ts` | Ni el guard ni el controlador conocen `ioredis`. Ambos dependen de `TokenRevocationService`, inyectado por el contenedor de Nest. Si mañana la lista se moviera a una tabla de Postgres, **solo cambiaría el cuerpo de ese servicio**: el guard y el logout no se enterarían. |
+| **OCP** — Abierto/cerrado | `jwt-auth.guard.ts:53` | El guard se **extiende** con un paso nuevo sin modificar el anterior: la llamada a `super.canActivate()` queda intacta y el paso de revocación se encadena después. La prueba de que es cierto está en la suite: los 2 casos que describen el comportamiento previo (token no revocado → pasa; ruta `@Public()` → ni consulta la lista) **siguen en verde** después del cambio. |
+
+El repositorio ya nombraba SRP, DIP, OCP e ISP en las tablas de patrones de los Avances 1 a 3, así que documentarlos aquí es seguir la convención del equipo, no añadir una capa nueva.
+
 ---
 
 ## 3. Decisiones técnicas
