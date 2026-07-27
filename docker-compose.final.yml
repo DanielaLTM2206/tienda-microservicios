@@ -1,0 +1,66 @@
+# =============================================================================
+#  docker-compose.final.yml  —  Tarea 3 (sistema integrado)  ·  solo temas vistos
+#
+#  Es el sistema completo de las Tareas 1 y 2 + seguridad y observabilidad:
+#   - JWT + Guard en el Gateway (variable JWT_SECRET).
+#   - Sentry para logs (variable SENTRY_DSN).
+#
+#  Levantar:   docker compose -f docker-compose.final.yml up -d --build
+#  (Definan JWT_SECRET y SENTRY_DSN en un archivo .env junto a este compose.)
+# =============================================================================
+services:
+
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: app, POSTGRES_PASSWORD: app, POSTGRES_DB: app }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports: ["15672:15672"]
+    restart: unless-stopped
+
+  svc-pedidos:
+    build: ./apps/pedidos
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      GRPC_PRODUCTOS_URL: svc-productos:5000
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on: [db, redis, rabbitmq, svc-productos]
+    restart: unless-stopped
+
+  svc-productos:
+    build: ./apps/productos
+    environment: { DB_HOST: db, GRPC_PORT: 5000, SENTRY_DSN: ${SENTRY_DSN:-} }
+    depends_on: [db]
+    restart: unless-stopped
+
+  svc-notificaciones:
+    build: ./apps/notificaciones
+    environment: { RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672, SENTRY_DSN: ${SENTRY_DSN:-} }
+    depends_on: [rabbitmq]
+    restart: unless-stopped
+
+  # Gateway con AUTENTICACIÓN JWT + GUARD y logs con Sentry.
+  gateway:
+    build: ./apps/gateway
+    environment:
+      SVC_PEDIDOS_HOST: svc-pedidos
+      SVC_PEDIDOS_PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-cambienme_por_un_secreto}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports: ["3000:3000"]
+    depends_on: [svc-pedidos]
+    restart: unless-stopped
