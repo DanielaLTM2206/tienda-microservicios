@@ -26,6 +26,18 @@ import Redis from 'ioredis';
  *   no aporta seguridad y hace crecer la lista sin limite. Con el TTL alineado
  *   a `exp`, Redis libera la entrada exactamente cuando deja de ser necesaria.
  *
+ * PRINCIPIOS APLICADOS:
+ *
+ *   SRP (Single Responsibility) — esta clase tiene UNA sola razon para
+ *   cambiar: como se almacenan y consultan las sesiones revocadas. No sabe
+ *   nada de HTTP, de Passport ni de rutas. El JwtAuthGuard, a su vez, no
+ *   sabe que por debajo hay Redis: solo pregunta "¿esta revocado este jti?".
+ *
+ *   DIP (Dependency Inversion) — el guard depende de esta abstraccion
+ *   inyectada, no del cliente ioredis. Si manana la lista se moviera a una
+ *   tabla de Postgres o a Memcached, solo cambiaria el cuerpo de esta clase:
+ *   ni el guard ni el controlador de logout se enterarian.
+ *
  * Convencion del repo: se sigue el mismo patron de cliente ioredis que
  * PedidosService y NotificacionesService (constructor + logger + cierre en
  * el hook de ciclo de vida).

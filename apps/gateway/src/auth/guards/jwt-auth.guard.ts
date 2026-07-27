@@ -49,6 +49,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
    * El orden importa: primero la firma, porque no tiene sentido consultar
    * Redis por el `jti` de un token que ni siquiera es autentico — eso
    * permitiria a un anonimo generar trafico contra el almacen.
+   *
+   * PRINCIPIOS APLICADOS:
+   *
+   *   OCP (Open/Closed) — el guard se EXTIENDE con un paso nuevo sin
+   *   modificar el anterior: la llamada a super.canActivate() (firma y
+   *   expiracion) queda intacta, y el paso 2 se encadena despues. Por eso
+   *   los casos de prueba del comportamiento previo siguen pasando.
+   *
+   *   DIP (Dependency Inversion) — este guard no conoce Redis. Depende de
+   *   TokenRevocationService, inyectado por el contenedor de Nest. La
+   *   decision de donde vive la lista de revocados no le afecta.
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // getAllAndOverride: el decorador del handler gana sobre el del controlador
