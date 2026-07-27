@@ -140,6 +140,12 @@ Cuando Daniela añadió `bcrypt` al gateway, Claude afirmó que **fallaría al c
 | `despues-ruta-protegida-401.txt` | **La misma petición con el mismo token** → **401 "Sesion cerrada: este token fue revocado mediante logout"** |
 | `despues-casos-borde.txt` | Los tres casos borde: logout sin token → 401; logout dos veces → sin caída; token de otro usuario → sigue en 200. Incluye la clave en Redis y su TTL decreciendo |
 
+**ANTES → DESPUÉS en una sola ejecución.** El token se obtiene una vez y se reutiliza en las tres peticiones; lo único que ocurre entre la primera y la última es el logout:
+
+![Antes y despues del logout: el mismo token pasa de 200 a 401](evidencia-antes-despues.png)
+
+---
+
 **Prueba automatizada (entregable 4):**
 
 | Archivo | Qué demuestra |
@@ -147,11 +153,23 @@ Cuando Daniela añadió `bcrypt` al gateway, Claude afirmó que **fallaría al c
 | `prueba-antes-sin-el-cambio.png` / `.txt` | La suite contra el guard **anterior**: 3 fallos, 2 pasan. Los 3 que fallan son exactamente los del comportamiento nuevo |
 | `prueba-despues-con-el-cambio.png` / `.txt` | La misma suite con el cambio aplicado: **5 de 5 pasando** |
 
+**SIN mi cambio** — fallan los 3 casos del comportamiento nuevo; pasan los 2 que describen el comportamiento previo, que no debía romperse:
+
+![La suite falla contra el guard anterior: 3 failed, 2 passed](prueba-antes-sin-el-cambio.png)
+
+**CON mi cambio** — 5 de 5:
+
+![La suite pasa con el cambio aplicado: 5 passed](prueba-despues-con-el-cambio.png)
+
+---
+
 **Proceso (entregable 8):**
 
 | Archivo | Qué demuestra |
 |---|---|
 | `kanban-examen.png` | Tarjeta `#24` en la columna `Hecho` del ShopMS Board, enlazada al Pull Request |
+
+![Tarjeta #24 en la columna Hecho del ShopMS Board](kanban-examen.png)
 
 **Cómo reproducir mi cambio desde cero:**
 
