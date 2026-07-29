@@ -638,6 +638,77 @@
     }
 
     /* ====================================================
+       AVANCE DIVIDER SLIDES
+       ==================================================== */
+    .slide-avance {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background:
+        radial-gradient(ellipse at 30% 40%, rgba(13, 74, 31, 0.6) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 60%, rgba(201, 162, 39, 0.1) 0%, transparent 50%),
+        var(--bg-dark);
+    }
+    .avance-number {
+      font-family: var(--font-serif);
+      font-size: 9rem;
+      font-weight: 900;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--espe-green-light) 0%, var(--espe-gold) 60%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      opacity: 0.18;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -55%);
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .avance-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.25em;
+      color: var(--espe-gold);
+      margin-bottom: 1rem;
+    }
+    .avance-title {
+      font-family: var(--font-serif);
+      font-size: 3rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, #fff 30%, var(--espe-gold-light) 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.25rem;
+      line-height: 1.1;
+    }
+    .avance-desc {
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      line-height: 1.65;
+      margin-bottom: 2rem;
+    }
+    .avance-pills {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .avance-pill {
+      background: rgba(13, 74, 31, 0.5);
+      border: 1px solid rgba(201, 162, 39, 0.35);
+      color: var(--espe-gold-light);
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+
+    /* ====================================================
        SLIDE 2: Problema y Dominio
        ==================================================== */
     .problem-box {
@@ -1452,6 +1523,22 @@
     </div>
 
     <!-- ============================================================
+         AVANCE 1 — DIVIDER
+         ============================================================ -->
+    <div class="slide slide-avance" id="slide-avance-1">
+      <div class="avance-number">01</div>
+      <div class="avance-label">Primer Entregable</div>
+      <h2 class="avance-title">Avance 1</h2>
+      <p class="avance-desc">Comunicación síncrona entre microservicios usando <strong style="color:#fff">TCP</strong>, primera capa asíncrona con <strong style="color:#fca5a5">Redis Pub/Sub</strong>, y medición experimental de latencia y acoplamiento temporal.</p>
+      <div class="avance-pills">
+        <span class="avance-pill">TCP Síncrono</span>
+        <span class="avance-pill">Redis Pub/Sub</span>
+        <span class="avance-pill">Benchmark 200 req</span>
+        <span class="avance-pill">Acoplamiento Temporal</span>
+      </div>
+    </div>
+
+    <!-- ============================================================
          SLIDE 4 — AVANCE 1: LATENCIA Y ACOPLAMIENTO
          ============================================================ -->
     <div class="slide" id="slide-4">
@@ -1528,6 +1615,22 @@
             <span style="color:var(--text-muted);">{"statusCode":503,"message":"svc-pedidos no responde"}</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         AVANCE 2 — DIVIDER
+         ============================================================ -->
+    <div class="slide slide-avance" id="slide-avance-2">
+      <div class="avance-number">02</div>
+      <div class="avance-label">Segundo Entregable</div>
+      <h2 class="avance-title">Avance 2</h2>
+      <p class="avance-desc">Incorporación de <strong style="color:var(--espe-gold)">gRPC con contratos Protocol Buffer</strong> para comunicación crítica tipada, y <strong style="color:#fdba74">RabbitMQ con colas durables</strong> para garantía de entrega de mensajes.</p>
+      <div class="avance-pills">
+        <span class="avance-pill">gRPC Contract-First</span>
+        <span class="avance-pill">Protocol Buffers</span>
+        <span class="avance-pill">RabbitMQ Cola Durable</span>
+        <span class="avance-pill">ACK Garantizado</span>
       </div>
     </div>
 
@@ -1656,6 +1759,22 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         AVANCE 3 — DIVIDER
+         ============================================================ -->
+    <div class="slide slide-avance" id="slide-avance-3">
+      <div class="avance-number">03</div>
+      <div class="avance-label">Tercer Entregable</div>
+      <h2 class="avance-title">Avance 3</h2>
+      <p class="avance-desc">Capa de <strong style="color:#4ade80">seguridad con JWT y control de roles</strong> centralizada en el Gateway, <strong style="color:#fca5a5">observabilidad con Sentry</strong>, y corrección del proceso de desarrollo con GitHub Flow.</p>
+      <div class="avance-pills">
+        <span class="avance-pill">JWT Stateless</span>
+        <span class="avance-pill">RBAC + Guards</span>
+        <span class="avance-pill">Sentry 5xx</span>
+        <span class="avance-pill">GitHub Flow</span>
       </div>
     </div>
 
