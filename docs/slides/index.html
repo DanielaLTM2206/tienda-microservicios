@@ -1949,10 +1949,9 @@
         <div class="runbook-step">
           <div class="runbook-num">2</div>
           <div class="runbook-detail">
-            <div class="runbook-title">Obtener token JWT (admin / admin123)</div>
+            <div class="runbook-title">Obtener token JWT y guardarlo en la variable $token</div>
             <div class="runbook-cmd-container">
-              <div class="runbook-cmd" id="cmd-2">curl -X POST http://localhost:3000/api/auth/login -H "Content-Type:
-                application/json" -d '{"username":"admin","password":"admin123"}'</div>
+              <div class="runbook-cmd" id="cmd-2">$token = (curl.exe -s -X POST http://localhost:3000/api/auth/login -H "Content-Type: application/json" -d '{\"username\":\"admin\",\"password\":\"admin123\"}' | ConvertFrom-Json).access_token</div>
               <button class="runbook-copy tooltip" onclick="copyCmd('cmd-2',this)"><svg width="13" height="13"
                   fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round"
@@ -1966,7 +1965,7 @@
           <div class="runbook-detail">
             <div class="runbook-title">Sin token → demostrar 401 (Guard activo)</div>
             <div class="runbook-cmd-container">
-              <div class="runbook-cmd" id="cmd-3">curl http://localhost:3000/api/pedidos</div>
+              <div class="runbook-cmd" id="cmd-3">curl.exe http://localhost:3000/api/pedidos</div>
               <button class="runbook-copy tooltip" onclick="copyCmd('cmd-3',this)"><svg width="13" height="13"
                   fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round"
@@ -1978,10 +1977,9 @@
         <div class="runbook-step">
           <div class="runbook-num">4</div>
           <div class="runbook-detail">
-            <div class="runbook-title">Crear pedido con token admin (activa TCP, gRPC, Redis, RabbitMQ)</div>
+            <div class="runbook-title">Crear pedido usando $token (activa TCP, gRPC, Redis, RabbitMQ)</div>
             <div class="runbook-cmd-container">
-              <div class="runbook-cmd" id="cmd-4">curl -X POST http://localhost:3000/api/pedidos -H "Content-Type:
-                application/json" -H "Authorization: Bearer &lt;TOKEN&gt;" -d '{"productoId":1,"cantidad":2}'</div>
+              <div class="runbook-cmd" id="cmd-4">curl.exe -s -X POST http://localhost:3000/api/pedidos -H "Content-Type: application/json" -H "Authorization: Bearer $token" -d '{\"productoId\":1,\"cantidad\":2}'</div>
               <button class="runbook-copy tooltip" onclick="copyCmd('cmd-4',this)"><svg width="13" height="13"
                   fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round"
@@ -1995,8 +1993,7 @@
           <div class="runbook-detail">
             <div class="runbook-title">Detener svc-productos → forzar 503 → ver error en Sentry</div>
             <div class="runbook-cmd-container">
-              <div class="runbook-cmd" id="cmd-5">docker compose -f docker-compose.final.yml stop ms-productos && curl
-                -H "Authorization: Bearer &lt;TOKEN&gt;" http://localhost:3000/api/pedidos</div>
+              <div class="runbook-cmd" id="cmd-5">docker compose -f docker-compose.final.yml stop ms-productos; curl.exe -H "Authorization: Bearer $token" http://localhost:3000/api/pedidos</div>
               <button class="runbook-copy tooltip" onclick="copyCmd('cmd-5',this)"><svg width="13" height="13"
                   fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round"

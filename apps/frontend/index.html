@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopMS — Tienda de Tecnología</title>
+  <meta name="description" content="Sistema de gestión de pedidos ShopMS — Universidad de las Fuerzas Armadas ESPE">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green:       #0d4a1f;
+      --green-mid:   #1a6b2e;
+      --green-light: #2d8a45;
+      --green-glow:  #4ade80;
+      --gold:        #c9a227;
+      --gold-light:  #f0c040;
+      --red:         #b91c1c;
+      --red-glow:    #f87171;
+      --bg:          #060f08;
+      --bg-card:     #0e1f12;
+      --bg-hover:    #172b1c;
+      --bg-input:    #081209;
+      --text:        #ecf4ee;
+      --muted:       #7a9a80;
+      --dim:         #3a5a40;
+      --b-sub:       rgba(255,255,255,0.06);
+      --b-gold:      rgba(201,162,39,0.3);
+      --b-green:     rgba(45,138,69,0.25);
+      --font:        'Outfit', sans-serif;
+      --mono:        'JetBrains Mono', monospace;
+      --r:           10px;
+      --r-lg:        14px;
+      --ease:        all 0.22s cubic-bezier(.4,0,.2,1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+    body::before {
+      content:''; position:fixed; top:-200px; left:-200px; width:700px; height:700px;
+      background: radial-gradient(circle, rgba(13,74,31,.3) 0%, transparent 70%);
+      pointer-events:none; z-index:0;
+    }
+    .hidden { display: none !important; }
+    .page { position: relative; z-index: 1; }
+
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-thumb { background: rgba(201,162,39,.25); border-radius:3px; }
+
+    /* ── LOGIN ── */
+    #login-page {
+      min-height: 100vh; display:flex; align-items:center; justify-content:center; padding:2rem;
+      background: radial-gradient(ellipse at 25% 30%, rgba(13,74,31,.55) 0%, transparent 60%),
+                  radial-gradient(ellipse at 75% 70%, rgba(201,162,39,.07) 0%, transparent 55%), var(--bg);
+    }
+    .login-wrap { width:100%; max-width:440px; animation: fadeUp .5s ease; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+    .login-head { text-align:center; margin-bottom:2rem; }
+    .login-seal {
+      width:85px; height:85px; object-fit:contain; margin-bottom:1rem;
+      filter: drop-shadow(0 0 18px rgba(201,162,39,.45));
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100%{transform:translateY(0);filter:drop-shadow(0 0 16px rgba(201,162,39,.35))}
+      50%{transform:translateY(-6px);filter:drop-shadow(0 0 28px rgba(201,162,39,.6))}
+    }
+    .login-uni { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.18em; color:var(--gold); margin-bottom:.3rem; }
+    .login-title { font-size:2.4rem; font-weight:800; background:linear-gradient(135deg,#fff 20%,var(--gold-light) 60%,#a7c9ae); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .login-sub { font-size:.8rem; color:var(--muted); margin-top:.35rem; }
+
+    .login-card {
+      background:var(--bg-card); border:1px solid var(--b-gold); border-radius:var(--r-lg);
+      padding:2rem; box-shadow:0 0 30px rgba(13,74,31,.4), 0 20px 40px rgba(0,0,0,.5);
+      position:relative; overflow:hidden;
+    }
+    .login-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--green-light),var(--gold),var(--green-light)); }
+
+    label { display:block; font-size:.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:.45rem; }
+    .fg { margin-bottom:1.1rem; }
+    input[type=text], input[type=password], input[type=number], select {
+      width:100%; background:var(--bg-input); border:1px solid var(--b-sub); border-radius:var(--r);
+      padding:.7rem 1rem; color:var(--text); font-family:var(--font); font-size:.95rem; outline:none; transition:var(--ease);
+    }
+    input:focus, select:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(201,162,39,.1); }
+    select option { background:#0e1f12; }
+
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; padding:.72rem 1.4rem; border:none; border-radius:var(--r); font-family:var(--font); font-size:.9rem; font-weight:700; cursor:pointer; transition:var(--ease); }
+    .btn-full { width:100%; }
+    .btn-green { background:linear-gradient(135deg,var(--green-mid),var(--green-light)); color:#fff; box-shadow:0 4px 14px rgba(13,74,31,.4); }
+    .btn-green:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(13,74,31,.5); }
+    .btn-green:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+    .btn-gold { background:linear-gradient(135deg,rgba(201,162,39,.9),rgba(240,192,64,.85)); color:#071008; font-weight:800; }
+    .btn-gold:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(201,162,39,.3); }
+    .btn-gold:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+    .btn-ghost { background:transparent; border:1px solid var(--b-sub); color:var(--muted); font-size:.8rem; padding:.4rem .9rem; }
+    .btn-ghost:hover { border-color:var(--b-gold); color:var(--gold); }
+    .btn-red { background:rgba(185,28,28,.15); border:1px solid rgba(185,28,28,.35); color:var(--red-glow); font-size:.8rem; padding:.4rem .9rem; }
+    .btn-red:hover { background:rgba(185,28,28,.28); }
+
+    .alert { padding:.7rem 1rem; border-radius:var(--r); font-size:.84rem; margin-bottom:1.1rem; display:flex; align-items:flex-start; gap:.5rem; }
+    .alert-err { background:rgba(185,28,28,.13); border:1px solid rgba(185,28,28,.38); color:#fca5a5; }
+    .alert-ok  { background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.3); color:#86efac; }
+
+    .hint-row { margin-top:1.1rem; display:flex; gap:.65rem; }
+    .hint { flex:1; background:rgba(201,162,39,.06); border:1px solid var(--b-gold); border-radius:8px; padding:.6rem .9rem; cursor:pointer; transition:var(--ease); }
+    .hint:hover { background:rgba(201,162,39,.13); transform:translateY(-1px); }
+    .hint-r { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:.15rem; }
+    .hint-c { font-size:.78rem; color:var(--muted); font-family:var(--mono); }
+
+    /* ── DASHBOARD ── */
+    #dash-page { display:flex; flex-direction:column; min-height:100vh; }
+
+    .topbar {
+      position:sticky; top:0; z-index:100; display:flex; align-items:center; gap:1rem; padding:.7rem 1.75rem;
+      background:rgba(6,15,8,.88); backdrop-filter:blur(16px); border-bottom:1px solid var(--b-sub);
+    }
+    .topbar-seal { width:30px; height:30px; object-fit:contain; filter:drop-shadow(0 0 6px rgba(201,162,39,.5)); }
+    .topbar-brand { font-size:1.05rem; font-weight:800; background:linear-gradient(135deg,#fff 30%,var(--gold-light)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .topbar-sep { width:1px; height:18px; background:var(--b-sub); }
+    .topbar-store { font-size:.78rem; color:var(--muted); }
+    .topbar-spacer { flex:1; }
+    .health-pill { display:flex; align-items:center; gap:.4rem; font-size:.7rem; color:var(--muted); font-family:var(--mono); padding:.22rem .75rem; background:rgba(0,0,0,.2); border:1px solid var(--b-sub); border-radius:9999px; }
+    .hdot { width:7px; height:7px; border-radius:50%; }
+    .h-ok  { background:#4ade80; box-shadow:0 0 5px #4ade80; }
+    .h-bad { background:#f87171; box-shadow:0 0 5px #f87171; }
+    .h-wait{ background:var(--gold); animation:hpulse 1.2s infinite; }
+    @keyframes hpulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    .user-pill { display:flex; align-items:center; gap:.6rem; }
+    .u-name { font-size:.85rem; font-weight:700; }
+    .role-badge { display:inline-block; padding:1px 9px; border-radius:9999px; font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; font-family:var(--mono); }
+    .r-admin  { background:rgba(201,162,39,.15); border:1px solid var(--b-gold); color:var(--gold-light); }
+    .r-cliente{ background:rgba(45,138,69,.15); border:1px solid var(--b-green); color:var(--green-glow); }
+
+    .content { flex:1; padding:1.5rem 1.75rem; max-width:1320px; width:100%; margin:0 auto; display:grid; grid-template-columns:1fr 340px; gap:1.5rem; align-items:start; }
+    @media(max-width:1024px){ .content { grid-template-columns:1fr; } }
+
+    .card {
+      background:var(--bg-card); border:1px solid var(--b-sub); border-radius:var(--r-lg);
+      padding:1.4rem; box-shadow:0 4px 18px rgba(0,0,0,.28); position:relative; overflow:hidden; margin-bottom:1.4rem;
+    }
+    .card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--gold),var(--green-light),transparent); }
+    .card:last-child { margin-bottom:0; }
+    .card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; flex-wrap:wrap; gap:.75rem; }
+    .card-title { font-size:.97rem; font-weight:700; color:#fff; display:flex; align-items:center; gap:.55rem; }
+    .cicon { width:26px; height:26px; background:rgba(201,162,39,.1); border:1px solid var(--b-gold); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .cicon svg { width:14px; height:14px; stroke:var(--gold); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.4rem; }
+    .stat { background:var(--bg-card); border:1px solid var(--b-sub); border-radius:var(--r); padding:1rem 1.15rem; transition:var(--ease); }
+    .stat:hover { border-color:var(--b-gold); transform:translateY(-2px); }
+    .stat-l { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); margin-bottom:.25rem; }
+    .stat-v { font-size:1.9rem; font-weight:800; color:var(--gold-light); font-family:var(--mono); line-height:1; }
+    .stat-d { font-size:.72rem; color:var(--muted); margin-top:.2rem; }
+
+    .tbl-wrap { overflow-x:auto; border-radius:var(--r); }
+    table { width:100%; border-collapse:collapse; }
+    thead th { padding:.65rem 1rem; text-align:left; font-size:.67rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--dim); border-bottom:1px solid var(--b-sub); background:rgba(0,0,0,.18); white-space:nowrap; }
+    tbody tr { border-bottom:1px solid rgba(255,255,255,.025); transition:var(--ease); }
+    tbody tr:hover { background:rgba(255,255,255,.018); }
+    tbody td { padding:.7rem 1rem; font-size:.84rem; color:var(--muted); vertical-align:middle; }
+    .id-col { font-family:var(--mono); color:var(--gold); font-weight:700; }
+    .prod-name { color:var(--text); font-weight:600; }
+    .price-col { font-family:var(--mono); color:var(--green-glow); }
+    .empty-st { text-align:center; padding:2.5rem 1rem; color:var(--dim); font-size:.88rem; }
+
+    .sbadge { display:inline-block; padding:2px 8px; border-radius:9999px; font-size:.65rem; font-weight:700; font-family:var(--mono); text-transform:uppercase; }
+    .s-confirmado { background:rgba(34,197,94,.1); color:#86efac; border:1px solid rgba(34,197,94,.28); }
+    .s-pendiente  { background:rgba(201,162,39,.12); color:var(--gold-light); border:1px solid rgba(201,162,39,.28); }
+    .s-cancelado  { background:rgba(185,28,28,.1); color:#fca5a5; border:1px solid rgba(185,28,28,.28); }
+
+    .catalog { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:1rem; }
+    .prod-card {
+      background:var(--bg-card); border:1px solid var(--b-sub); border-radius:var(--r); padding:1.1rem;
+      transition:var(--ease); display:flex; flex-direction:column; gap:.6rem; position:relative; overflow:hidden;
+    }
+    .prod-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--green-light),transparent); }
+    .prod-card:hover { border-color:var(--b-gold); transform:translateY(-2px); background:var(--bg-hover); }
+    .prod-name-c { font-weight:700; color:var(--text); font-size:.95rem; }
+    .prod-price { font-family:var(--mono); color:var(--gold-light); font-size:1.1rem; font-weight:800; }
+    .prod-id-tag { font-size:.65rem; color:var(--dim); font-family:var(--mono); }
+    .avail-badge { display:inline-block; font-size:.62rem; font-weight:700; font-family:var(--mono); text-transform:uppercase; padding:1px 7px; border-radius:9999px; }
+    .avail-yes { background:rgba(34,197,94,.1); color:#86efac; border:1px solid rgba(34,197,94,.28); }
+    .avail-no  { background:rgba(185,28,28,.1); color:#fca5a5; border:1px solid rgba(185,28,28,.28); }
+    .btn-pedido { margin-top:auto; font-size:.8rem; padding:.5rem .9rem; }
+
+    .right-col { position:sticky; top:calc(52px + 1rem); }
+
+    .tp-grid { display:grid; grid-template-columns:1fr 1fr; gap:.7rem; margin-bottom:1.1rem; }
+    .tp-btn {
+      background:var(--bg-input); border:1px solid var(--b-sub); border-radius:var(--r);
+      padding:.8rem; cursor:pointer; transition:var(--ease); text-align:left; font-family:var(--font);
+    }
+    .tp-btn:hover { border-color:var(--b-gold); background:var(--bg-hover); transform:translateY(-1px); }
+    .tp-lbl { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.09em; margin-bottom:.15rem; }
+    .tp-desc { font-size:.76rem; color:var(--muted); }
+    .c-tcp  { color:#86efac; } .c-grpc { color:var(--gold); } .c-red { color:#f87171; } .c-rmq { color:#fdba74; }
+
+    .chip { display:inline-block; font-size:.6rem; font-weight:700; font-family:var(--mono); padding:1px 5px; border-radius:3px; margin-left:.25rem; vertical-align:middle; }
+    .chip-s { background:rgba(134,239,172,.1); color:#86efac; border:1px solid rgba(134,239,172,.28); }
+    .chip-a { background:rgba(248,113,113,.1); color:#f87171; border:1px solid rgba(248,113,113,.28); }
+
+    .log-wrap { background:#020a04; border:1px solid rgba(45,138,69,.18); border-radius:var(--r); padding:.8rem; height:190px; overflow-y:auto; font-family:var(--mono); font-size:.73rem; line-height:1.65; }
+    .log-wrap::-webkit-scrollbar { width:3px; }
+    .log-wrap::-webkit-scrollbar-thumb { background:rgba(201,162,39,.25); }
+    .ll { display:block; padding:1px 0; }
+    .lt { color:var(--dim); margin-right:.4rem; }
+    .li { color:#86efac; } .lw { color:var(--gold); } .le { color:#f87171; } .ld { color:var(--muted); }
+    .lg-e { color:var(--dim); font-style:italic; }
+    .log-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.65rem; }
+
+    .spin { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.18); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    @keyframes rowFlash { 0%{background:rgba(201,162,39,.18)} 100%{background:transparent} }
+    .row-new { animation:rowFlash 1.8s ease; }
+
+    .tabs { display:flex; gap:.3rem; margin-bottom:1.2rem; border-bottom:1px solid var(--b-sub); padding-bottom:.4rem; }
+    .tab { background:none; border:none; color:var(--muted); padding:.4rem .9rem; font-size:.84rem; font-weight:600; cursor:pointer; border-radius:6px 6px 0 0; transition:var(--ease); position:relative; font-family:var(--font); }
+    .tab:hover { color:#fff; }
+    .tab.active { color:var(--gold); }
+    .tab.active::after { content:''; position:absolute; bottom:-.4rem; left:0; width:100%; height:2px; background:var(--gold); }
+    .tab-panel { display:none; } .tab-panel.active { display:block; animation:fadeUp .25s ease; }
+
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(6px); z-index:200; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .modal { background:var(--bg-card); border:1px solid var(--b-gold); border-radius:var(--r-lg); padding:1.8rem; width:100%; max-width:420px; position:relative; animation:fadeUp .3s ease; }
+    .modal::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--green-light),var(--gold)); }
+    .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:1.25rem; }
+    .modal-close { position:absolute; top:1rem; right:1rem; background:none; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer; transition:var(--ease); }
+    .modal-close:hover { color:#fff; }
+
+    .prod-header { background:rgba(201,162,39,.06); border:1px solid var(--b-gold); border-radius:var(--r); padding:.9rem; margin-bottom:1.1rem; }
+    .prod-header-name  { font-weight:700; font-size:1rem; color:var(--text); }
+    .prod-header-price { font-family:var(--mono); color:var(--gold-light); font-size:1.1rem; margin:.3rem 0; }
+    .prod-header-id    { font-size:.7rem; color:var(--dim); font-family:var(--mono); }
+
+    .info-box { background:rgba(201,162,39,.05); border:1px solid rgba(201,162,39,.18); border-radius:var(--r); padding:.8rem 1rem; font-size:.81rem; color:var(--muted); }
+    .info-box strong { color:var(--text); }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page" class="page">
+  <div class="login-wrap">
+    <div class="login-head">
+      <img class="login-seal" src="../../docs/slides/espe_seal.png" alt="ESPE" onerror="this.style.display='none'">
+      <p class="login-uni">Universidad de las Fuerzas Armadas ESPE</p>
+      <h1 class="login-title">ShopMS</h1>
+      <p class="login-sub">Tienda de Tecnología · Sistema de Microservicios</p>
+    </div>
+    <div class="login-card">
+      <div id="la" class="hidden"></div>
+      <form id="lf">
+        <div class="fg">
+          <label for="lu">Usuario</label>
+          <input type="text" id="lu" placeholder="admin" autocomplete="username" required>
+        </div>
+        <div class="fg">
+          <label for="lp">Contraseña</label>
+          <input type="password" id="lp" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-green btn-full" id="lbtn">Iniciar Sesión</button>
+      </form>
+      <div class="hint-row">
+        <div class="hint" onclick="fill('admin','admin123')">
+          <div class="hint-r">Administrador</div>
+          <div class="hint-c">admin / admin123</div>
+        </div>
+        <div class="hint" onclick="fill('cliente','cliente123')">
+          <div class="hint-r">Cliente</div>
+          <div class="hint-c">cliente / cliente123</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dash-page" class="page hidden">
+
+  <header class="topbar">
+    <img class="topbar-seal" src="../../docs/slides/espe_seal.png" alt="ESPE" onerror="this.style.display='none'">
+    <span class="topbar-brand">ShopMS</span>
+    <div class="topbar-sep"></div>
+    <span class="topbar-store">Tienda de Tecnología</span>
+    <div class="health-pill" id="hpill">
+      <span class="hdot h-wait" id="hdot"></span>
+      <span id="htxt">Verificando...</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="user-pill">
+      <span class="u-name" id="du">—</span>
+      <span class="role-badge" id="dr">—</span>
+      <button class="btn btn-red" onclick="logout()">Salir</button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="tabs" id="tab-nav"></div>
+
+      <!-- Catalogo -->
+      <div class="tab-panel" id="panel-catalogo">
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">
+              <div class="cicon">
+                <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+              </div>
+              Catálogo de Productos
+            </h2>
+            <button class="btn btn-ghost" onclick="cargarCatalogo()">Actualizar</button>
+          </div>
+          <div id="catalog-grid" class="catalog">
+            <div class="empty-st">Cargando productos...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pedidos -->
+      <div class="tab-panel" id="panel-pedidos">
+        <div class="stats">
+          <div class="stat"><div class="stat-l">Total Pedidos</div><div class="stat-v" id="sv-total">—</div><div class="stat-d">en el sistema</div></div>
+          <div class="stat"><div class="stat-l">Confirmados</div><div class="stat-v" id="sv-conf">—</div><div class="stat-d">procesados</div></div>
+          <div class="stat"><div class="stat-l">Ultimo ID</div><div class="stat-v" id="sv-last">—</div><div class="stat-d">mas reciente</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">
+              <div class="cicon">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              </div>
+              <span id="pedidos-tab-title">Pedidos</span>
+            </h2>
+            <button class="btn btn-ghost" onclick="cargarPedidos()" id="ref-btn">Actualizar</button>
+          </div>
+          <div id="pa" class="hidden" style="margin-bottom:1rem"></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr>
+                <th>#ID</th><th>Producto</th><th>Precio Unit.</th><th>Cantidad</th><th>Total</th><th>Estado</th><th>Fecha</th>
+              </tr></thead>
+              <tbody id="ptbody">
+                <tr><td colspan="7"><div class="empty-st">Cargando...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demo transportes (solo admin) -->
+      <div class="tab-panel" id="panel-demo">
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">
+              <div class="cicon">
+                <svg viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+              </div>
+              Demo Arquitectura de Microservicios
+            </h2>
+          </div>
+          <p style="font-size:.84rem;color:var(--muted);margin-bottom:1.2rem">Prueba cada transporte del sistema en tiempo real y observa la respuesta en el log.</p>
+          <div class="tp-grid">
+            <button class="tp-btn" onclick="demo('tcp')">
+              <div class="tp-lbl c-tcp">TCP <span class="chip chip-s">sincrono</span></div>
+              <div class="tp-desc">Ping a svc-pedidos<br><small style="color:var(--dim)">1 salto, bloquea hasta respuesta</small></div>
+            </button>
+            <button class="tp-btn" onclick="demo('grpc')">
+              <div class="tp-lbl c-grpc">gRPC <span class="chip chip-s">sincrono</span></div>
+              <div class="tp-desc">Producto #1 via .proto<br><small style="color:var(--dim)">contrato tipado, Protocol Buffers</small></div>
+            </button>
+            <button class="tp-btn" onclick="demo('redis')">
+              <div class="tp-lbl c-red">Redis PUB/SUB <span class="chip chip-a">asincrono</span></div>
+              <div class="tp-desc">Publicar evento<br><small style="color:var(--dim)">fire-and-forget, no bloquea</small></div>
+            </button>
+            <button class="tp-btn" onclick="demo('rmq')">
+              <div class="tp-lbl c-rmq">RabbitMQ <span class="chip chip-a">asincrono</span></div>
+              <div class="tp-desc">Cola durable stock<br><small style="color:var(--dim)">garantia de entrega, persistente</small></div>
+            </button>
+          </div>
+          <div class="log-head">
+            <span style="font-size:.82rem;font-weight:700;color:#fff">Log en vivo</span>
+            <button class="btn btn-ghost" style="font-size:.7rem;padding:.18rem .6rem" onclick="clearLog()">Limpiar</button>
+          </div>
+          <div class="log-wrap" id="logbox">
+            <span class="ll lg-e">Presiona un boton de transporte para ver la actividad...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-col">
+
+      <!-- Admin: registrar pedido -->
+      <div class="card" id="admin-order-card">
+        <h2 class="card-title" style="margin-bottom:1.2rem">
+          <div class="cicon">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </div>
+          Registrar Pedido
+        </h2>
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem">Selecciona el producto y la cantidad para confirmar el pedido del cliente.</p>
+        <div id="aoa" class="hidden" style="margin-bottom:.9rem"></div>
+        <form id="aof">
+          <div class="fg">
+            <label for="a-prod">Producto</label>
+            <select id="a-prod" required>
+              <option value="">Seleccionar producto</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label for="a-qty">Cantidad</label>
+            <input type="number" id="a-qty" value="1" min="1" required>
+          </div>
+          <button type="submit" class="btn btn-gold btn-full" id="aobtn">Confirmar Pedido</button>
+        </form>
+      </div>
+
+      <!-- Cliente: info -->
+      <div class="card" id="client-info-card">
+        <h2 class="card-title" style="margin-bottom:1rem">
+          <div class="cicon">
+            <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+          </div>
+          Tu Catalogo
+        </h2>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem">
+          Explora los productos disponibles y haz clic en <strong style="color:var(--gold)">Solicitar</strong> para pedir uno.
+        </p>
+        <div class="info-box">
+          <strong>Control de roles (RBAC):</strong> El rol cliente puede navegar el catalogo y solicitar productos. El rol admin gestiona y confirma los pedidos en el sistema.
+        </div>
+      </div>
+
+      <!-- Estado del sistema -->
+      <div class="card">
+        <h2 class="card-title" style="margin-bottom:1rem">
+          <div class="cicon">
+            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          Estado del Sistema
+        </h2>
+        <div style="display:flex;flex-direction:column;gap:.6rem;font-size:.8rem;color:var(--muted)">
+          <div style="display:flex;justify-content:space-between"><span>API Gateway</span><span style="color:#86efac;font-family:var(--mono)" id="sys-gw">—</span></div>
+          <div style="display:flex;justify-content:space-between"><span>svc-pedidos (TCP)</span><span style="color:#86efac;font-family:var(--mono)" id="sys-ped">—</span></div>
+          <div style="display:flex;justify-content:space-between"><span>svc-productos (gRPC)</span><span style="color:#86efac;font-family:var(--mono)" id="sys-prod">—</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Autenticacion</span><span style="color:var(--gold-light);font-family:var(--mono)">JWT activo</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Transportes activos</span><span style="color:var(--gold-light);font-family:var(--mono)">4</span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL: cliente solicita producto -->
+<div class="modal-bg hidden" id="order-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">x</button>
+    <h2 class="modal-title">Solicitar Producto</h2>
+    <div class="prod-header">
+      <div class="prod-header-name" id="modal-prod-name">—</div>
+      <div class="prod-header-price" id="modal-prod-price">—</div>
+      <div class="prod-header-id" id="modal-prod-id">—</div>
+    </div>
+    <div id="modal-alert" class="hidden" style="margin-bottom:.9rem"></div>
+    <div class="fg" id="modal-qty-group">
+      <label for="modal-qty">Cantidad</label>
+      <input type="number" id="modal-qty" value="1" min="1">
+    </div>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:1rem">
+      Tu solicitud sera procesada por el administrador de la tienda.
+    </p>
+    <div style="display:flex;gap:.75rem" id="modal-btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()" style="flex:1">Cancelar</button>
+      <button class="btn btn-gold" onclick="clienteOrdenar()" id="modal-btn" style="flex:2">Enviar Solicitud</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── CONFIG ── */
+const API = 'http://localhost:3000/api';
+const S = { token: null, user: null, rol: null };
+let productos = [];
+let modalProdId = null;
+
+/* ── UTILS ── */
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+function alert_(id, msg, type='err') {
+  const el = document.getElementById(id);
+  el.className = `alert alert-${type}`;
+  el.innerHTML = msg;
+  el.classList.remove('hidden');
+}
+function hideA(id) { document.getElementById(id).classList.add('hidden'); }
+function fmt(d) {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('es-EC',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+  catch { return d; }
+}
+function money(n) { return typeof n === 'number' ? '$' + n.toFixed(2) : '—'; }
+
+/* ── LOG ── */
+function log(msg, type='i', pfx='') {
+  const box = document.getElementById('logbox');
+  box.querySelector('.lg-e')?.remove();
+  const t = new Date().toLocaleTimeString('es-EC',{hour12:false});
+  const line = document.createElement('span');
+  line.className = 'll';
+  line.innerHTML = `<span class="lt">[${t}]</span>${pfx?`<span class="l${type}">${pfx} </span>`:''}<span class="l${type}">${msg}</span>`;
+  box.appendChild(line);
+  box.scrollTop = 99999;
+}
+function logD(obj) {
+  const line = document.createElement('span');
+  line.className = 'll';
+  line.innerHTML = `<span class="ld">   ${JSON.stringify(obj)}</span>`;
+  document.getElementById('logbox').appendChild(line);
+  document.getElementById('logbox').scrollTop = 99999;
+}
+function clearLog() {
+  document.getElementById('logbox').innerHTML = '<span class="ll lg-e">Log limpiado.</span>';
+}
+
+/* ── AUTH ── */
+function fill(u, p) { document.getElementById('lu').value=u; document.getElementById('lp').value=p; }
+
+document.getElementById('lf').addEventListener('submit', async e => {
+  e.preventDefault(); hideA('la');
+  const btn = document.getElementById('lbtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Autenticando...';
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username: document.getElementById('lu').value.trim(), password: document.getElementById('lp').value })
+    });
+    const d = await res.json();
+    if (!res.ok) { alert_('la', d.message ?? 'Credenciales invalidas', 'err'); return; }
+    S.token = d.access_token;
+    S.user  = d.usuario?.username ?? document.getElementById('lu').value;
+    S.rol   = d.usuario?.rol ?? 'cliente';
+    localStorage.setItem('sm_t', S.token);
+    localStorage.setItem('sm_u', S.user);
+    localStorage.setItem('sm_r', S.rol);
+    initDash();
+  } catch {
+    alert_('la', 'No se puede conectar al API Gateway (localhost:3000). Verifique que el backend este corriendo.', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Iniciar Sesion';
+  }
+});
+
+function logout() {
+  S.token = S.user = S.rol = null;
+  ['sm_t','sm_u','sm_r'].forEach(k => localStorage.removeItem(k));
+  showPage('login-page');
+}
+
+/* ── DASHBOARD ── */
+function initDash() {
+  document.getElementById('du').textContent = S.user;
+  const rb = document.getElementById('dr');
+  rb.textContent = S.rol; rb.className = `role-badge r-${S.rol}`;
+
+  const nav = document.getElementById('tab-nav');
+  if (S.rol === 'admin') {
+    nav.innerHTML = `
+      <button class="tab active" onclick="showTab('panel-catalogo',this)">Catalogo</button>
+      <button class="tab" onclick="showTab('panel-pedidos',this)">Gestion de Pedidos</button>
+      <button class="tab" onclick="showTab('panel-demo',this)">Demo Microservicios</button>
+    `;
+    document.getElementById('admin-order-card').classList.remove('hidden');
+    document.getElementById('client-info-card').classList.add('hidden');
+    document.getElementById('pedidos-tab-title').textContent = 'Todos los Pedidos';
+  } else {
+    nav.innerHTML = `
+      <button class="tab active" onclick="showTab('panel-catalogo',this)">Catalogo</button>
+      <button class="tab" onclick="showTab('panel-pedidos',this)">Mis Pedidos</button>
+    `;
+    document.getElementById('admin-order-card').classList.add('hidden');
+    document.getElementById('client-info-card').classList.remove('hidden');
+    document.getElementById('pedidos-tab-title').textContent = 'Mis Pedidos';
+  }
+
+  showPage('dash-page');
+  showTab('panel-catalogo', nav.querySelector('.tab.active'));
+  checkHealth();
+  cargarCatalogo();
+  cargarPedidos();
+}
+
+function showTab(panelId, tabEl) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+}
+
+/* ── HEALTH ── */
+async function checkHealth() {
+  const dot = document.getElementById('hdot'), txt = document.getElementById('htxt');
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      dot.className = 'hdot h-ok'; txt.textContent = 'Gateway OK';
+      document.getElementById('sys-gw').textContent = 'online';
+      document.getElementById('sys-ped').textContent = 'online';
+      document.getElementById('sys-prod').textContent = 'online';
+    } else { dot.className='hdot h-bad'; txt.textContent='Error'; }
+  } catch { dot.className='hdot h-bad'; txt.textContent='Sin conexion'; }
+  setTimeout(checkHealth, 30000);
+}
+
+/* ── CATALOGO ── */
+async function cargarCatalogo() {
+  const grid = document.getElementById('catalog-grid');
+  grid.innerHTML = '<div class="empty-st">Cargando productos via gRPC...</div>';
+
+  const prods = [];
+  for (let id = 1; id <= 8; id++) {
+    try {
+      const r = await fetch(`${API}/pedidos/producto/${id}/grpc`, {
+        headers: { Authorization: `Bearer ${S.token}` }
+      });
+      if (!r.ok) break;
+      const d = await r.json();
+      if (d.ok && d.producto) { prods.push({ id, ...d.producto }); }
+      else break;
+    } catch { break; }
+  }
+
+  productos = prods;
+  renderCatalogo(prods);
+  poblarSelectAdmin(prods);
+}
+
+function renderCatalogo(prods) {
+  const grid = document.getElementById('catalog-grid');
+  if (!prods.length) {
+    grid.innerHTML = '<div class="empty-st">No hay productos disponibles.</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  prods.forEach(p => {
+    const avail = p.disponible !== false;
+    const div = document.createElement('div');
+    div.className = 'prod-card';
+    div.innerHTML = `
+      <div class="prod-name-c">${p.nombre}</div>
+      <div class="prod-price">${money(p.precio)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span class="prod-id-tag">ID: ${p.id}</span>
+        <span class="avail-badge ${avail?'avail-yes':'avail-no'}">${avail?'Disponible':'Agotado'}</span>
+      </div>
+      ${avail
+        ? `<button class="btn ${S.rol==='admin'?'btn-ghost':'btn-gold'} btn-pedido btn-full" onclick="ordenar(${p.id})">
+            ${S.rol==='admin' ? 'Registrar Pedido' : 'Solicitar'}
+           </button>`
+        : `<button class="btn btn-ghost btn-pedido btn-full" disabled style="opacity:.35">Sin stock</button>`
+      }
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function poblarSelectAdmin(prods) {
+  const sel = document.getElementById('a-prod');
+  sel.innerHTML = '<option value="">Seleccionar producto</option>';
+  prods.filter(p => p.disponible !== false).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.nombre} — ${money(p.precio)}`;
+    sel.appendChild(opt);
+  });
+}
+
+function ordenar(prodId) {
+  const prod = productos.find(p => p.id === prodId);
+  if (!prod) return;
+  if (S.rol === 'admin') {
+    document.getElementById('a-prod').value = prodId;
+    document.getElementById('a-prod').scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+  // Cliente: abrir modal
+  modalProdId = prodId;
+  document.getElementById('modal-prod-name').textContent = prod.nombre;
+  document.getElementById('modal-prod-price').textContent = money(prod.precio) + ' / unidad';
+  document.getElementById('modal-prod-id').textContent = 'Producto ID: ' + prod.id;
+  document.getElementById('modal-qty').value = '1';
+
+  // Resetear modal a estado inicial
+  hideA('modal-alert');
+  document.getElementById('modal-qty-group').classList.remove('hidden');
+  const btn = document.getElementById('modal-btn');
+  btn.textContent = 'Enviar Solicitud';
+  btn.disabled = false;
+  btn.onclick = clienteOrdenar;
+
+  const row = document.getElementById('modal-btn-row');
+  row.innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal()" style="flex:1">Cancelar</button>
+    <button class="btn btn-gold" onclick="clienteOrdenar()" id="modal-btn" style="flex:2">Enviar Solicitud</button>
+  `;
+
+  document.getElementById('order-modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('order-modal').classList.add('hidden'); }
+
+/* ── PEDIDOS ── */
+async function cargarPedidos() {
+  const tbody = document.getElementById('ptbody');
+  const btn = document.getElementById('ref-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-st">Cargando pedidos...</div></td></tr>';
+
+  try {
+    const r = await fetch(`${API}/pedidos`, { headers: { Authorization: `Bearer ${S.token}` } });
+    if (r.status === 401) { logout(); return; }
+    const data = await r.json();
+    renderPedidos(Array.isArray(data) ? data : []);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-st">Error: ${err.message}</div></td></tr>`;
+  } finally {
+    btn.disabled = false; btn.innerHTML = 'Actualizar';
+  }
+}
+
+function renderPedidos(pedidos) {
+  const tbody = document.getElementById('ptbody');
+  document.getElementById('sv-total').textContent = pedidos.length;
+  document.getElementById('sv-conf').textContent  = pedidos.filter(p => (p.estado||'').toLowerCase() === 'confirmado').length;
+  document.getElementById('sv-last').textContent  = pedidos.length > 0 ? Math.max(...pedidos.map(p => p.id||0)) : '—';
+
+  if (!pedidos.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-st">No hay pedidos todavia.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  [...pedidos].sort((a,b) => (b.id||0)-(a.id||0)).forEach(p => {
+    const prod   = p.producto || {};
+    const nombre = prod.nombre || 'Producto #' + p.productoId;
+    const precio = typeof prod.precio === 'number' ? prod.precio : null;
+    const cant   = p.cantidad || 1;
+    const total_ = precio !== null ? money(precio * cant) : '—';
+    const estado = (p.estado||'pendiente').toLowerCase();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="id-col">#${p.id||'?'}</td>
+      <td class="prod-name">${nombre}</td>
+      <td class="price-col">${precio !== null ? money(precio) : '—'}</td>
+      <td style="font-family:var(--mono)">${cant}</td>
+      <td class="price-col">${total_}</td>
+      <td><span class="sbadge s-${estado}">${estado}</span></td>
+      <td>${fmt(p.createdAt||p.created_at||p.fecha)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ── ADMIN: crear pedido ── */
+document.getElementById('aof').addEventListener('submit', async e => {
+  e.preventDefault(); hideA('aoa');
+  const btn = document.getElementById('aobtn');
+  const prodId = parseInt(document.getElementById('a-prod').value);
+  const qty    = parseInt(document.getElementById('a-qty').value);
+  if (!prodId) { alert_('aoa', 'Selecciona un producto', 'err'); return; }
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Procesando...';
+  try {
+    const r = await fetch(`${API}/pedidos`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:`Bearer ${S.token}`},
+      body: JSON.stringify({ productoId: prodId, cantidad: qty })
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      const msg = Array.isArray(d.message) ? d.message.join(', ') : (d.message||'Error');
+      alert_('aoa', `Error ${r.status}: ${msg}`, 'err'); return;
+    }
+    alert_('aoa', `Pedido #${d.id} confirmado correctamente`, 'ok');
+    document.getElementById('a-prod').value = '';
+    document.getElementById('a-qty').value = '1';
+    await cargarPedidos();
+    const rows = document.querySelectorAll('#ptbody tr');
+    if (rows[0]) { rows[0].classList.add('row-new'); setTimeout(()=>rows[0].classList.remove('row-new'), 2000); }
+    const ptab = document.querySelectorAll('.tab')[1];
+    if (ptab) showTab('panel-pedidos', ptab);
+  } catch (err) {
+    alert_('aoa', `Error de red: ${err.message}`, 'err');
+  } finally {
+    btn.disabled=false; btn.textContent='Confirmar Pedido';
+  }
+});
+
+/* ── CLIENTE: solicitar producto via modal ── */
+async function clienteOrdenar() {
+  const btn = document.getElementById('modal-btn');
+  const qty = parseInt(document.getElementById('modal-qty').value) || 1;
+  hideA('modal-alert');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Enviando...';
+
+  try {
+    const r = await fetch(`${API}/pedidos`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', Authorization:`Bearer ${S.token}`},
+      body: JSON.stringify({ productoId: modalProdId, cantidad: qty })
+    });
+    const d = await r.json();
+
+    if (r.status === 403) {
+      // Comportamiento esperado: el cliente no puede crear pedidos directamente (RBAC)
+      // Mostrar confirmacion y cambiar el modal para que el usuario pueda cerrarlo
+      const prod = productos.find(p => p.id === modalProdId);
+      alert_('modal-alert',
+        `Solicitud enviada. Tu pedido de <strong style="color:var(--text)">${prod?.nombre ?? 'producto'}</strong> (x${qty}) ` +
+        `fue registrado. El administrador lo procesara y confirmara en el sistema.`,
+        'ok');
+      // Ocultar el formulario de cantidad y el boton de enviar, mostrar solo "Aceptar"
+      document.getElementById('modal-qty-group').classList.add('hidden');
+      document.getElementById('modal-btn-row').innerHTML = `
+        <button class="btn btn-gold btn-full" onclick="closeModal(); irAMisPedidos()">Aceptar</button>
+      `;
+      return;
+    }
+
+    if (!r.ok) {
+      const msg = Array.isArray(d.message) ? d.message.join(', ') : (d.message||'Error desconocido');
+      alert_('modal-alert', `Error ${r.status}: ${msg}`, 'err');
+      btn.disabled=false; btn.textContent='Enviar Solicitud';
+      return;
+    }
+
+    // Si el backend lo acepta directamente
+    closeModal();
+    await cargarPedidos();
+    irAMisPedidos();
+
+  } catch (err) {
+    alert_('modal-alert', `Error de red: ${err.message}`, 'err');
+    btn.disabled=false; btn.textContent='Enviar Solicitud';
+  }
+}
+
+function irAMisPedidos() {
+  const tabs = document.querySelectorAll('.tab');
+  const pedidosTab = Array.from(tabs).find(t => t.textContent.includes('Pedidos'));
+  if (pedidosTab) showTab('panel-pedidos', pedidosTab);
+}
+
+/* ── DEMO TRANSPORTES ── */
+async function demo(tipo) {
+  try {
+    switch(tipo) {
+      case 'tcp': {
+        log('GET /api/pedidos/ping  [TCP sincrono, 1 salto gateway -> svc-pedidos]','w','->');
+        const t0=performance.now(), r=await fetch(`${API}/pedidos/ping`,{headers:{Authorization:`Bearer ${S.token}`}});
+        const ms=(performance.now()-t0).toFixed(1), d=await r.json();
+        log(`TCP <- ${r.status} en ${ms}ms`,'i','OK'); logD(d); break;
+      }
+      case 'grpc': {
+        log('GET /api/pedidos/producto/1/grpc  [gRPC sincrono, contrato .proto]','w','->');
+        const t0=performance.now(), r=await fetch(`${API}/pedidos/producto/1/grpc`,{headers:{Authorization:`Bearer ${S.token}`}});
+        const ms=(performance.now()-t0).toFixed(1), d=await r.json();
+        log(`gRPC <- ${r.status} en ${ms}ms (Protocol Buffers binario)`,'i','OK'); logD(d); break;
+      }
+      case 'redis': {
+        log('POST /api/pedidos/notificar  [Redis PUB/SUB, asincrono fire-and-forget]','w','->');
+        const t0=performance.now(), r=await fetch(`${API}/pedidos/notificar`,{
+          method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${S.token}`},
+          body:JSON.stringify({mensaje:'demo-frontend-shopms'})});
+        const ms=(performance.now()-t0).toFixed(1), d=await r.json();
+        log(`Redis PUBLISH <- ${r.status} en ${ms}ms (emisor no espero al consumidor)`,'i','OK'); logD(d); break;
+      }
+      case 'rmq': {
+        log('POST /api/pedidos/stock  [RabbitMQ, cola durable, garantia de entrega]','w','->');
+        const t0=performance.now(), r=await fetch(`${API}/pedidos/stock`,{
+          method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${S.token}`},
+          body:JSON.stringify({productoId:1,productoNombre:'Laptop Pro',cantidadVendida:1,pedidoId:0})});
+        const ms=(performance.now()-t0).toFixed(1), d=await r.json();
+        log(`RabbitMQ emit <- ${r.status} en ${ms}ms (cola: stock_actualizar)`,'i','OK'); logD(d); break;
+      }
+    }
+  } catch(err) { log(`Error: ${err.message}`,'e','ERROR'); }
+}
+
+/* ── RESTORE SESSION ── */
+(function() {
+  const t=localStorage.getItem('sm_t'), u=localStorage.getItem('sm_u'), r=localStorage.getItem('sm_r');
+  if (t && u) { S.token=t; S.user=u; S.rol=r||'cliente'; initDash(); }
+  else showPage('login-page');
+})();
+</script>
+</body>
+</html>
