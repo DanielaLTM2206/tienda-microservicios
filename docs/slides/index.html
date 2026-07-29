@@ -1,0 +1,2229 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopMS — Universidad de las Fuerzas Armadas ESPE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet">
+
+  <style>
+    /* ====================================================
+       ESPE BRAND DESIGN SYSTEM
+       ==================================================== */
+    :root {
+      /* ESPE Institutional colors */
+      --espe-green: #0d4a1f;
+      --espe-green-mid: #1a6b2e;
+      --espe-green-light: #2d8a45;
+      --espe-red: #b91c1c;
+      --espe-red-mid: #dc2626;
+      --espe-gold: #c9a227;
+      --espe-gold-light: #f0c040;
+
+      /* Backgrounds */
+      --bg-dark: #0a1a0e;
+      /* Very dark military green */
+      --bg-card: #112217;
+      /* Dark card surface */
+      --bg-card-hover: #1a3323;
+      --bg-accent: #0f2d18;
+      /* Slightly lighter accent */
+      --bg-header-bar: #0d4a1f;
+
+      /* Text */
+      --text-main: #f0f4f1;
+      --text-muted: #a3b9a8;
+      --text-dark: #5a7a61;
+
+      /* Semantic */
+      --color-primary: var(--espe-green-mid);
+      --color-secondary: var(--espe-gold);
+      --color-accent: var(--espe-red);
+      --color-success: #22c55e;
+      --color-danger: var(--espe-red-mid);
+
+      /* Glows */
+      --glow-green: rgba(13, 74, 31, 0.3);
+      --glow-gold: rgba(201, 162, 39, 0.12);
+
+      /* Typography */
+      --font-serif: 'Merriweather', Georgia, serif;
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+
+    /* Subtle corner decorations */
+    .corner-deco {
+      position: fixed;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .corner-deco.top-left {
+      top: 0;
+      left: 0;
+      border-top: 4px solid var(--espe-green-mid);
+      border-left: 4px solid var(--espe-green-mid);
+      width: 40px;
+      height: 40px;
+    }
+
+    .corner-deco.top-right {
+      top: 0;
+      right: 0;
+      border-top: 4px solid var(--espe-green-mid);
+      border-right: 4px solid var(--espe-green-mid);
+      width: 40px;
+      height: 40px;
+    }
+
+    .corner-deco.bot-left {
+      bottom: 0;
+      left: 0;
+      border-bottom: 4px solid var(--espe-green-mid);
+      border-left: 4px solid var(--espe-green-mid);
+      width: 40px;
+      height: 40px;
+    }
+
+    .corner-deco.bot-right {
+      bottom: 0;
+      right: 0;
+      border-bottom: 4px solid var(--espe-green-mid);
+      border-right: 4px solid var(--espe-green-mid);
+      width: 40px;
+      height: 40px;
+    }
+
+    /* Ambient glows */
+    .glow-bg {
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--glow-green) 0%, transparent 70%);
+      top: -120px;
+      left: -120px;
+      z-index: 1;
+      pointer-events: none;
+      animation: float-glow 22s infinite alternate ease-in-out;
+    }
+
+    .glow-bg-secondary {
+      position: fixed;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--glow-gold) 0%, transparent 70%);
+      bottom: -100px;
+      right: -100px;
+      z-index: 1;
+      pointer-events: none;
+      animation: float-glow 28s infinite alternate-reverse ease-in-out;
+    }
+
+    @keyframes float-glow {
+      0% {
+        transform: translate(0, 0) scale(1);
+      }
+
+      100% {
+        transform: translate(40px, 30px) scale(1.1);
+      }
+    }
+
+    /* ====================================================
+       UNIVERSITY HEADER BAR (shown in every content slide)
+       ==================================================== */
+    .uni-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 52px;
+      background: linear-gradient(90deg, var(--espe-green) 0%, #1a6b2e 60%, #0a3d14 100%);
+      border-bottom: 3px solid var(--espe-gold);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      gap: 0.75rem;
+      z-index: 50;
+    }
+
+    .uni-header-seal {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 4px rgba(201, 162, 39, 0.5));
+    }
+
+    .uni-header-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .uni-header-name {
+      font-family: var(--font-serif);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--espe-gold);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .uni-header-dept {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.65);
+      letter-spacing: 0.03em;
+    }
+
+    .uni-header-spacer {
+      flex: 1;
+    }
+
+    .uni-header-badge {
+      background: rgba(201, 162, 39, 0.15);
+      border: 1px solid rgba(201, 162, 39, 0.4);
+      color: var(--espe-gold-light);
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* ====================================================
+       PROGRESS BAR
+       ==================================================== */
+    .progress-bar {
+      position: fixed;
+      top: 52px;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--espe-gold) 0%, var(--espe-green-light) 100%);
+      width: 0%;
+      z-index: 100;
+      transition: width 0.35s ease;
+    }
+
+    /* ====================================================
+       SLIDES
+       ==================================================== */
+    .slides-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 4.5rem 3.5rem 5.5rem 3.5rem;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(40px) scale(0.985);
+      transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0) scale(1);
+    }
+
+    .slide.exit-left {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-40px) scale(0.985);
+    }
+
+    /* Slide header stripe */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 2px solid transparent;
+      border-image: linear-gradient(90deg, var(--espe-gold), var(--espe-green-light), transparent) 1;
+      flex-shrink: 0;
+    }
+
+    .slide-title {
+      font-family: var(--font-serif);
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 30%, var(--espe-gold-light) 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .slide-subtitle {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--espe-gold);
+    }
+
+    .slide-content {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slide-content::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .slide-content::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 3px;
+    }
+
+    .slide-content::-webkit-scrollbar-thumb {
+      background: rgba(201, 162, 39, 0.3);
+      border-radius: 3px;
+    }
+
+    /* ====================================================
+       NAVIGATION
+       ==================================================== */
+    .nav-controls {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      background: rgba(13, 34, 17, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(201, 162, 39, 0.25);
+      z-index: 90;
+    }
+
+    .nav-btn {
+      background: none;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      transition: var(--transition);
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      background: rgba(201, 162, 39, 0.15);
+      color: var(--espe-gold);
+    }
+
+    .nav-btn:disabled {
+      color: var(--text-dark);
+      cursor: not-allowed;
+    }
+
+    .slide-counter {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--espe-gold);
+      min-width: 3rem;
+      text-align: center;
+    }
+
+    .keyboard-hint {
+      position: fixed;
+      bottom: 1.4rem;
+      right: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--text-dark);
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      z-index: 90;
+    }
+
+    .key-badge {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* ====================================================
+       GRID & CARDS
+       ==================================================== */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 1.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--espe-gold) 0%, var(--espe-green-light) 100%);
+    }
+
+    .card:hover {
+      border-color: rgba(201, 162, 39, 0.3);
+      transform: translateY(-2px);
+      background: var(--bg-card-hover);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.9rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    ul.custom-list {
+      list-style: none;
+    }
+
+    ul.custom-list li {
+      position: relative;
+      padding-left: 1.4rem;
+      margin-bottom: 0.65rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    ul.custom-list li::before {
+      content: "▶";
+      position: absolute;
+      left: 0;
+      color: var(--espe-gold);
+      font-size: 0.6rem;
+      top: 0.3rem;
+    }
+
+    /* ====================================================
+       SLIDE 1: PORTADA
+       ==================================================== */
+    .slide-portada {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background:
+        radial-gradient(ellipse at 20% 30%, rgba(13, 74, 31, 0.45) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 70%, rgba(201, 162, 39, 0.08) 0%, transparent 50%),
+        var(--bg-dark);
+    }
+
+    .portada-institution {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--espe-gold);
+      margin-bottom: 0.5rem;
+    }
+
+    .portada-uni {
+      font-family: var(--font-serif);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 2rem;
+    }
+
+    .portada-seal-wrapper {
+      position: relative;
+      margin-bottom: 2rem;
+    }
+
+    .portada-seal {
+      width: 150px;
+      height: 150px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 20px rgba(201, 162, 39, 0.45)) drop-shadow(0 0 40px rgba(13, 74, 31, 0.5));
+      animation: seal-pulse 4s ease-in-out infinite;
+    }
+
+    @keyframes seal-pulse {
+
+      0%,
+      100% {
+        filter: drop-shadow(0 0 16px rgba(201, 162, 39, 0.4)) drop-shadow(0 0 35px rgba(13, 74, 31, 0.45));
+      }
+
+      50% {
+        filter: drop-shadow(0 0 28px rgba(201, 162, 39, 0.65)) drop-shadow(0 0 50px rgba(13, 74, 31, 0.6));
+      }
+    }
+
+    .portada-gold-line {
+      width: 80px;
+      height: 2px;
+      margin: 0 auto 1.5rem auto;
+      background: linear-gradient(90deg, transparent, var(--espe-gold), transparent);
+    }
+
+    .portada-title {
+      font-family: var(--font-serif);
+      font-size: 3.8rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #ffffff 20%, #f0c040 60%, #a7c9ae 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1rem;
+    }
+
+    .portada-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 650px;
+      line-height: 1.5;
+      margin-bottom: 2.5rem;
+    }
+
+    .portada-dept-badge {
+      background: rgba(201, 162, 39, 0.1);
+      border: 1px solid rgba(201, 162, 39, 0.35);
+      color: var(--espe-gold-light);
+      padding: 0.4rem 1.25rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      animation: badge-glow 2.5s infinite ease-in-out;
+    }
+
+    @keyframes badge-glow {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
+      }
+
+      50% {
+        box-shadow: 0 0 14px 0 rgba(201, 162, 39, 0.25);
+      }
+    }
+
+    .team-grid {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      max-width: 820px;
+    }
+
+    .member-card {
+      background: rgba(17, 34, 23, 0.7);
+      border: 1px solid rgba(201, 162, 39, 0.15);
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      flex: 1;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .member-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--espe-gold), var(--espe-green-light));
+    }
+
+    .member-card:hover {
+      border-color: rgba(201, 162, 39, 0.45);
+      transform: translateY(-4px);
+      background: rgba(26, 51, 35, 0.85);
+    }
+
+    .member-role {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--espe-gold);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .member-name {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.2rem;
+    }
+
+    .member-github {
+      font-size: 0.78rem;
+      color: var(--text-dark);
+      font-family: var(--font-mono);
+    }
+
+    /* ====================================================
+       SLIDE 2: Problema y Dominio
+       ==================================================== */
+    .problem-box {
+      border-left: 3px solid var(--espe-red);
+    }
+
+    .problem-box::before {
+      background: var(--espe-red);
+    }
+
+    .solution-box {
+      border-left: 3px solid var(--espe-green-light);
+    }
+
+    /* ====================================================
+       SLIDE 3: ARQUITECTURA SVG
+       ==================================================== */
+    .arch-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .arch-toolbar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      justify-content: center;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .arch-btn {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: var(--text-muted);
+      padding: 0.4rem 1rem;
+      border-radius: 5px;
+      font-weight: 500;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .arch-btn:hover {
+      background: var(--bg-card-hover);
+      color: #fff;
+    }
+
+    .arch-btn.active {
+      background: var(--espe-green-mid);
+      color: #fff;
+      border-color: var(--espe-green-mid);
+      box-shadow: 0 0 12px rgba(26, 107, 46, 0.5);
+    }
+
+    .arch-canvas {
+      flex-grow: 1;
+      background: rgba(10, 26, 14, 0.6);
+      border: 1px solid rgba(201, 162, 39, 0.12);
+      border-radius: 10px;
+      position: relative;
+      min-height: 350px;
+    }
+
+    .arch-svg {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* svg-node applied to <rect>/<path> only — NOT to <g> — to avoid filter bleeding onto text */
+    .svg-node {
+      fill: var(--bg-card);
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-width: 1.5px;
+      transition: var(--transition);
+    }
+
+    .svg-node-active {
+      stroke: var(--espe-gold) !important;
+      stroke-width: 2.5px !important;
+      fill: #0f2d18 !important;
+    }
+
+    /* text elements: keep weight=400 so drop-shadows from parent groups don't make them appear bold */
+    .svg-text-title {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 12px;
+      fill: #e8f0ea;
+    }
+
+    .svg-text-desc {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 9px;
+      fill: #5a7a61;
+    }
+
+    .svg-text-role {
+      font-family: var(--font-sans);
+      font-size: 8px;
+      fill: var(--espe-gold);
+      font-weight: 400;
+    }
+
+    /* ====================================================
+       EVIDENCIAS SLIDE (slide 9)
+       ==================================================== */
+    .evidencias-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .ev-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(201, 162, 39, 0.15);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: var(--transition);
+      cursor: zoom-in;
+    }
+
+    .ev-card:hover {
+      border-color: rgba(201, 162, 39, 0.45);
+      transform: scale(1.02);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .ev-card img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      display: block;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .ev-card-label {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--espe-gold);
+      line-height: 1.3;
+    }
+
+    .ev-card-sub {
+      padding: 0 0.75rem 0.6rem;
+      font-size: 0.73rem;
+      color: var(--text-muted);
+    }
+
+    /* Lightbox overlay for enlarged images */
+    #ev-lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(8px);
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    #ev-lightbox.open {
+      display: flex;
+    }
+
+    #ev-lightbox img {
+      max-width: 90vw;
+      max-height: 85vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 0 60px rgba(201, 162, 39, 0.3);
+    }
+
+    .svg-link {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.06);
+      stroke-width: 1.5px;
+      stroke-dasharray: 4 4;
+      transition: var(--transition);
+    }
+
+    .svg-link.active-flow {
+      stroke-dasharray: none;
+      animation: link-dash 1s linear infinite;
+    }
+
+    .svg-link.flow-sync {
+      stroke: #86efac;
+      stroke-width: 3px;
+    }
+
+    .svg-link.flow-redis {
+      stroke: #fca5a5;
+      stroke-width: 3px;
+    }
+
+    .svg-link.flow-grpc {
+      stroke: var(--espe-gold);
+      stroke-width: 3px;
+    }
+
+    .svg-link.flow-rmq {
+      stroke: #fdba74;
+      stroke-width: 3px;
+    }
+
+    @keyframes link-dash {
+      to {
+        stroke-dashoffset: -20;
+      }
+    }
+
+    /* ====================================================
+       TABLES
+       ==================================================== */
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+      text-align: left;
+    }
+
+    table.data-table th {
+      padding: 0.65rem 0.9rem;
+      border-bottom: 2px solid rgba(201, 162, 39, 0.3);
+      color: var(--espe-gold);
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    table.data-table td {
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+    }
+
+    table.data-table tr:hover td {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .hl-gold {
+      font-weight: 700;
+      color: var(--espe-gold) !important;
+      font-family: var(--font-mono);
+    }
+
+    .hl-green {
+      font-weight: 700;
+      color: var(--espe-green-light) !important;
+      font-family: var(--font-mono);
+    }
+
+    .math-bubble {
+      background: var(--bg-accent);
+      border: 1px dashed rgba(201, 162, 39, 0.3);
+      border-radius: 8px;
+      padding: 0.85rem;
+      text-align: center;
+      font-size: 0.95rem;
+      margin-top: 0.9rem;
+      color: var(--espe-gold-light);
+    }
+
+    .math-bubble code {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* ====================================================
+       TABS (Slide 5)
+       ==================================================== */
+    .tabs-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      height: 100%;
+    }
+
+    .tab-headers {
+      display: flex;
+      gap: 0.4rem;
+      border-bottom: 1px solid rgba(201, 162, 39, 0.2);
+      padding-bottom: 0.4rem;
+    }
+
+    .tab-header {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.45rem 1rem;
+      font-size: 0.87rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 5px 5px 0 0;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .tab-header:hover {
+      color: #fff;
+    }
+
+    .tab-header.active {
+      color: var(--espe-gold);
+      font-weight: 700;
+    }
+
+    .tab-header.active::after {
+      content: "";
+      position: absolute;
+      bottom: -0.4rem;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--espe-gold);
+    }
+
+    .tab-content {
+      display: none;
+      padding-top: 0.5rem;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    pre {
+      background: #040d06;
+      border: 1px solid rgba(201, 162, 39, 0.1);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.83rem;
+      line-height: 1.45;
+      color: #c6d6c8;
+      max-height: 240px;
+    }
+
+    .kw {
+      color: #f87171;
+    }
+
+    /* keywords  */
+    .tp {
+      color: var(--espe-gold);
+    }
+
+    /* types    */
+    .str {
+      color: #86efac;
+    }
+
+    /* strings  */
+    .cmt {
+      color: #4a6a50;
+    }
+
+    /* comments */
+    .num {
+      color: #fb923c;
+    }
+
+    /* numbers  */
+
+    /* ====================================================
+       BADGES
+       ==================================================== */
+    .flow-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      margin-left: 0.4rem;
+    }
+
+    .b-jwt {
+      background: rgba(201, 162, 39, 0.15);
+      color: var(--espe-gold-light);
+    }
+
+    .b-guard {
+      background: rgba(34, 197, 94, 0.12);
+      color: #4ade80;
+    }
+
+    .b-sentry {
+      background: rgba(185, 28, 28, 0.15);
+      color: #fca5a5;
+    }
+
+    /* ====================================================
+       RUNBOOK (Slide 8)
+       ==================================================== */
+    .runbook-step {
+      display: flex;
+      gap: 1.25rem;
+      margin-bottom: 1.1rem;
+      align-items: flex-start;
+    }
+
+    .runbook-num {
+      background: var(--bg-accent);
+      color: var(--espe-gold);
+      border: 1px solid rgba(201, 162, 39, 0.4);
+      width: 1.65rem;
+      height: 1.65rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 0.2rem;
+      font-family: var(--font-mono);
+    }
+
+    .runbook-detail {
+      flex-grow: 1;
+    }
+
+    .runbook-title {
+      font-weight: 600;
+      color: #fff;
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .runbook-cmd-container {
+      display: flex;
+      margin-top: 0.4rem;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(201, 162, 39, 0.15);
+      max-width: 640px;
+    }
+
+    .runbook-cmd {
+      background: #040d06;
+      padding: 0.45rem 0.9rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #a3b9a8;
+      flex-grow: 1;
+      white-space: nowrap;
+      overflow-x: auto;
+    }
+
+    .runbook-copy {
+      background: var(--bg-card);
+      border: none;
+      border-left: 1px solid rgba(201, 162, 39, 0.15);
+      color: var(--text-muted);
+      padding: 0 0.9rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+    }
+
+    .runbook-copy:hover {
+      background: rgba(201, 162, 39, 0.1);
+      color: var(--espe-gold);
+    }
+
+    .tooltip {
+      position: relative;
+    }
+
+    .tooltip::after {
+      content: "¡Copiado!";
+      position: absolute;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%) translateY(5px);
+      background: var(--espe-green-mid);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      font-family: var(--font-sans);
+    }
+
+    .tooltip.show-tooltip::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ====================================================
+       Q&A ACCORDION (Slide 10)
+       ==================================================== */
+    .qa-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .qa-item {
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+      transition: var(--transition);
+    }
+
+    .qa-item:hover {
+      border-color: rgba(201, 162, 39, 0.15);
+    }
+
+    .qa-item.active {
+      border-color: rgba(201, 162, 39, 0.3);
+    }
+
+    .qa-question {
+      padding: 0.9rem 1.25rem;
+      font-weight: 600;
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .qa-question::after {
+      content: "▼";
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      transition: transform 0.3s ease;
+    }
+
+    .qa-item.active .qa-question::after {
+      transform: rotate(180deg);
+      color: var(--espe-gold);
+    }
+
+    .qa-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(10, 26, 14, 0.4);
+    }
+
+    .qa-answer-content {
+      padding: 0.9rem 1.25rem;
+      border-top: 1px solid rgba(201, 162, 39, 0.1);
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .qa-answer-content strong {
+      color: var(--espe-gold-light);
+    }
+
+    .qa-answer-content code {
+      font-family: var(--font-mono);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #86efac;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Decorative corners -->
+  <div class="corner-deco top-left"></div>
+  <div class="corner-deco top-right"></div>
+  <div class="corner-deco bot-left"></div>
+  <div class="corner-deco bot-right"></div>
+
+  <div class="glow-bg"></div>
+  <div class="glow-bg-secondary"></div>
+  <div class="progress-bar" id="progressBar"></div>
+
+  <div class="slides-container" id="slidesContainer">
+
+    <!-- ============================================================
+         SLIDE 1 — PORTADA
+         ============================================================ -->
+    <div class="slide slide-portada active" id="slide-1">
+      <p class="portada-institution">Universidad de las Fuerzas Armadas</p>
+      <p class="portada-uni">ESPE — Ecuador · Departamento de Ciencias de la Computación</p>
+
+      <div class="portada-seal-wrapper">
+        <img class="portada-seal" src="espe_seal.png" alt="Sello ESPE" />
+      </div>
+
+      <div class="portada-gold-line"></div>
+
+      <h1 class="portada-title">ShopMS</h1>
+      <p class="portada-subtitle">Sistema de Gestión de Pedidos con Arquitectura de Microservicios Híbrida y
+        Comunicaciones Multi-Transporte</p>
+
+      <span class="portada-dept-badge">Aplicaciones Distribuidas 7.º Semestre · Proyecto Final</span>
+
+      <div class="team-grid">
+        <div class="member-card">
+          <div class="member-role">Backend & Arquitectura</div>
+          <div class="member-name">Daniela Tituaña</div>
+          <div class="member-github">@DanielaLTM2206</div>
+        </div>
+        <div class="member-card">
+          <div class="member-role">Transportes & Comunicación</div>
+          <div class="member-name">Stiven Molina</div>
+          <div class="member-github">@gsMolina02</div>
+        </div>
+        <div class="member-card">
+          <div class="member-role">Documentación & QA</div>
+          <div class="member-name">Jeffrey Manobanda</div>
+          <div class="member-github">@jeffrey2206</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 2 — EL PROBLEMA Y DOMINIO
+         ============================================================ -->
+    <div class="slide" id="slide-2">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">ShopMS — Proyecto Final</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">El Problema y Dominio del MVP</h2>
+        <span class="slide-subtitle">Contexto de Diseño</span>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card problem-box">
+          <h3 class="card-title" style="color:var(--espe-red-mid);">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            El Problema
+          </h3>
+          <ul class="custom-list">
+            <li><strong>Monolitos Acoplados:</strong> Los sistemas tradicionales sufren bloqueos síncronos en cascada,
+              degradando disponibilidad y escalabilidad global.</li>
+            <li><strong>Protocolo Único:</strong> Tratar toda la comunicación interna como HTTP REST es ineficiente; no
+              garantiza entrega en flujos asíncronos.</li>
+            <li><strong>Pérdida de Identidad de Errores:</strong> Al cruzar fronteras de red, los errores se vuelven
+              genéricos e impiden diagnósticos rápidos.</li>
+          </ul>
+        </div>
+        <div class="card solution-box">
+          <h3 class="card-title" style="color:var(--espe-green-light);">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Dominio Simplificado
+          </h3>
+          <ul class="custom-list">
+            <li><strong>Pedidos (svc-pedidos):</strong> Microservicio central que gestiona el ciclo de vida del pedido,
+              escribe en su BD local y propaga eventos.</li>
+            <li><strong>Productos (svc-productos):</strong> Catálogo maestro que valida disponibilidad ante solicitudes
+              síncronas.</li>
+            <li><strong>Notificaciones (svc-notificaciones):</strong> Consumidor desacoplado que reacciona a eventos de
+              broker.</li>
+            <li><strong>API Gateway:</strong> Punto único HTTP que traduce REST → TCP/gRPC y aplica seguridad.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 3 — ARQUITECTURA INTERACTIVA
+         ============================================================ -->
+    <div class="slide" id="slide-3">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">ShopMS — Proyecto Final</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Arquitectura del Sistema Integrado</h2>
+        <span class="slide-subtitle">Diagrama Dinámico</span>
+      </div>
+      <div class="slide-content arch-container">
+        <div class="arch-toolbar">
+          <button class="arch-btn active" data-flow="all">Mostrar Todo</button>
+          <button class="arch-btn" data-flow="sync-tcp"><span style="color:#86efac">●</span> Síncrono TCP</button>
+          <button class="arch-btn" data-flow="async-redis"><span style="color:#fca5a5">●</span> Asíncrono Redis</button>
+          <button class="arch-btn" data-flow="grpc-flow"><span style="color:var(--espe-gold)">●</span> gRPC
+            Contrato</button>
+          <button class="arch-btn" data-flow="rabbitmq-flow"><span style="color:#fdba74">●</span> RabbitMQ Cola</button>
+        </div>
+        <div class="arch-canvas">
+          <svg class="arch-svg" viewBox="0 0 800 360">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a6a50" />
+              </marker>
+            </defs>
+            <!-- Links -->
+            <path id="link-client-gateway" d="M 60,180 L 140,180" class="svg-link" marker-end="url(#arrow)" />
+            <path id="link-gateway-pedidos" d="M 240,180 L 320,180" class="svg-link" marker-end="url(#arrow)" />
+            <path id="link-pedidos-productos-tcp" d="M 400,160 L 520,110" class="svg-link" marker-end="url(#arrow)" />
+            <path id="link-pedidos-productos-grpc" d="M 400,180 L 520,150" class="svg-link" marker-end="url(#arrow)" />
+            <path id="link-pedidos-redis" d="M 380,220 L 490,260" class="svg-link" marker-end="url(#arrow)" />
+            <path id="link-redis-notif" d="M 550,280 L 640,240" class="svg-link" marker-end="url(#arrow)" />
+            <path id="link-pedidos-rabbitmq" d="M 340,220 L 340,300 L 490,320" class="svg-link"
+              marker-end="url(#arrow)" />
+            <path id="link-rabbitmq-notif" d="M 550,330 L 680,330 L 680,240" class="svg-link"
+              marker-end="url(#arrow)" />
+            <path d="M 360,140 L 360,80" class="svg-link" style="stroke-dasharray:2 2;" />
+            <path d="M 580,110 L 580,80" class="svg-link" style="stroke-dasharray:2 2;" />
+            <!-- Nodes -->
+            <g id="node-client">
+              <rect x="10" y="150" width="70" height="60" class="svg-node" rx="6" /><text x="45" y="175"
+                text-anchor="middle" class="svg-text-title">Cliente</text><text x="45" y="195" text-anchor="middle"
+                class="svg-text-desc">curl/Postman</text>
+            </g>
+            <g id="node-gateway">
+              <rect x="140" y="115" width="100" height="130" class="svg-node" rx="6" /><text x="190" y="140"
+                text-anchor="middle" class="svg-text-title">Gateway</text><text x="190" y="158" text-anchor="middle"
+                class="svg-text-desc">JWT & Guards</text><text x="190" y="173" text-anchor="middle"
+                class="svg-text-desc">Sentry (5xx)</text><text x="190" y="195" text-anchor="middle"
+                class="svg-text-role">Puerto 3000</text>
+            </g>
+            <g id="node-pedidos">
+              <rect x="320" y="140" width="100" height="80" class="svg-node" rx="6" /><text x="370" y="165"
+                text-anchor="middle" class="svg-text-title">svc-pedidos</text><text x="370" y="180" text-anchor="middle"
+                class="svg-text-desc">TCP + gRPC Client</text><text x="370" y="205" text-anchor="middle"
+                class="svg-text-role">Puerto 3001</text>
+            </g>
+            <g id="node-productos">
+              <rect x="520" y="100" width="120" height="85" class="svg-node" rx="6" /><text x="580" y="125"
+                text-anchor="middle" class="svg-text-title">svc-productos</text><text x="580" y="142"
+                text-anchor="middle" class="svg-text-desc">TCP + gRPC Server</text><text x="580" y="170"
+                text-anchor="middle" class="svg-text-role">Port 3002 / 5000</text>
+            </g>
+            <g id="node-notificaciones">
+              <rect x="640" y="155" width="135" height="85" class="svg-node" rx="6" /><text x="707" y="183"
+                text-anchor="middle" class="svg-text-title">svc-notificaciones</text><text x="707" y="200"
+                text-anchor="middle" class="svg-text-desc">Redis + RabbitMQ Sub</text>
+            </g>
+            <!-- Databases -->
+            <g id="node-db-p">
+              <path d="M 330,48 C 330,35 390,35 390,48 L 390,72 C 390,85 330,85 330,72 Z"
+                style="fill:#091a0c;stroke:rgba(255,255,255,0.07);stroke-width:1.5;" /><text x="360" y="63"
+                text-anchor="middle" style="font-size:8px;fill:#fff;font-weight:bold;">pedidos_db</text>
+            </g>
+            <g id="node-db-pr">
+              <path d="M 550,48 C 550,35 610,35 610,48 L 610,72 C 610,85 550,85 550,72 Z"
+                style="fill:#091a0c;stroke:rgba(255,255,255,0.07);stroke-width:1.5;" /><text x="580" y="63"
+                text-anchor="middle" style="font-size:8px;fill:#fff;font-weight:bold;">productos_db</text>
+            </g>
+            <!-- Brokers -->
+            <g id="node-redis">
+              <rect x="490" y="245" width="70" height="38" rx="19"
+                style="fill:#0a1a0e;stroke:#fca5a5;stroke-width:1.5;" /><text x="525" y="269" text-anchor="middle"
+                class="svg-text-title" style="font-size:11px;">Redis</text>
+            </g>
+            <g id="node-rabbitmq">
+              <rect x="490" y="303" width="70" height="38" rx="5"
+                style="fill:#0a1a0e;stroke:#fdba74;stroke-width:1.5;" /><text x="525" y="327" text-anchor="middle"
+                class="svg-text-title" style="font-size:11px;">RabbitMQ</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 4 — AVANCE 1: LATENCIA Y ACOPLAMIENTO
+         ============================================================ -->
+    <div class="slide" id="slide-4">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">Avance 1</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Avance 1: Latencia y Acoplamiento</h2>
+        <span class="slide-subtitle">Benchmark Real y Prueba de Caída</span>
+      </div>
+      <div class="slide-content grid-2">
+        <div>
+          <div class="card" style="margin-bottom:1.25rem;">
+            <h3 class="card-title">Benchmark (200 Peticiones por Camino)</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Camino</th>
+                  <th>Promedio</th>
+                  <th>p95</th>
+                  <th>Máx</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1 Salto — TCP x1 (<code>/ping</code>)</td>
+                  <td class="hl-green">2.71 ms</td>
+                  <td>3.00 ms</td>
+                  <td>120 ms</td>
+                </tr>
+                <tr>
+                  <td>2 Saltos — TCP x2 + BD (<code>/pedidos</code>)</td>
+                  <td class="hl-gold">4.86 ms</td>
+                  <td>6.00 ms</td>
+                  <td>83 ms</td>
+                </tr>
+                <tr>
+                  <td>Asíncrono — Redis PUBLISH</td>
+                  <td>3.12 ms</td>
+                  <td>4.00 ms</td>
+                  <td>62 ms</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="math-bubble">
+            Costo neto del 2.º salto TCP + BD:<br>
+            <code>4.86 ms − 2.71 ms ≈ 2.15 ms</code> adicionales
+          </div>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:0.9rem;">
+          <h3 class="card-title" style="color:var(--espe-red-mid);">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+            Acoplamiento Temporal Demostrado
+          </h3>
+          <ul class="custom-list">
+            <li>Al detener <strong>svc-productos</strong>, la cadena síncrona completa falla con <code>503</code> —
+              ningún nodo puede suplir la ausencia del siguiente en la cadena.</li>
+            <li>El camino asíncrono (Redis) continúa operando con <code>201 OK</code>: el emisor publica y retorna sin
+              esperar al consumidor.</li>
+          </ul>
+          <div
+            style="background:rgba(4,13,6,0.8);border-radius:7px;padding:0.65rem;font-family:var(--font-mono);font-size:0.75rem;border:1px solid rgba(185,28,28,0.2);">
+            <span style="color:var(--espe-red-mid);">$ curl http://localhost:3000/api/pedidos</span><br>
+            <span style="color:var(--text-muted);">{"statusCode":503,"message":"svc-pedidos no responde"}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 5 — AVANCE 2: gRPC + RabbitMQ
+         ============================================================ -->
+    <div class="slide" id="slide-5">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">Avance 2</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Avance 2: gRPC + RabbitMQ</h2>
+        <span class="slide-subtitle">Contratos y Garantías de Entrega</span>
+      </div>
+      <div class="slide-content tabs-container">
+        <div class="tab-headers">
+          <button class="tab-header active" data-tab="grpc">Contrato gRPC (Contract-First)</button>
+          <button class="tab-header" data-tab="rabbitmq">Cola Durable RabbitMQ</button>
+          <button class="tab-header" data-tab="compare">Tabla Comparativa</button>
+        </div>
+        <div class="tab-content active" id="tab-grpc">
+          <div class="grid-2" style="margin-top:0.5rem;">
+            <div>
+              <p style="font-size:0.9rem;color:var(--text-muted);line-height:1.55;margin-bottom:0.9rem;">
+                El contrato único vive en <span
+                  style="color:var(--espe-gold);font-family:var(--font-mono);">libs/proto/</span> (raíz del monorepo) y
+                es copiado a cada imagen Docker en build. Una sola fuente de verdad evita la divergencia de esquemas
+                entre servicios.
+              </p>
+              <ul class="custom-list">
+                <li><strong>Tipado Estricto:</strong> Validación en tiempo de compilación con Protocol Buffers.</li>
+                <li><strong>Eficiencia:</strong> Serialización binaria sobre HTTP/2, más compacta que JSON.</li>
+                <li><strong>Error Controlado:</strong> Producto inexistente retorna <code>encontrado=false</code> sin
+                  caer el servicio.</li>
+              </ul>
+            </div>
+            <pre><code><span class="cmt">// libs/proto/productos.proto</span>
+<span class="kw">syntax</span> = <span class="str">"proto3"</span>;
+<span class="kw">package</span> productos;
+
+<span class="kw">service</span> ProductosService {
+  <span class="kw">rpc</span> ObtenerProducto (ProductoRequest)
+      <span class="kw">returns</span> (ProductoResponse);
+}
+
+<span class="kw">message</span> ProductoResponse {
+  <span class="tp">int32</span>  id         = <span class="num">1</span>;
+  <span class="tp">string</span> nombre     = <span class="num">2</span>;
+  <span class="tp">double</span> precio     = <span class="num">3</span>;
+  <span class="tp">bool</span>   encontrado = <span class="num">5</span>;
+}</code></pre>
+          </div>
+        </div>
+        <div class="tab-content" id="tab-rabbitmq">
+          <div class="grid-2" style="margin-top:0.5rem;">
+            <div>
+              <h3
+                style="font-size:1rem;font-weight:700;font-family:var(--font-serif);margin-bottom:0.65rem;color:#fff;">
+                Garantía de entrega crítica para el stock</h3>
+              <ul class="custom-list">
+                <li><strong>Cola Durable <code>stock_actualizar</code>:</strong> Los mensajes persisten en disco en el
+                  broker y sobreviven reinicios del servicio.</li>
+                <li>Si <code>svc-notificaciones</code> cae, RabbitMQ retiene el mensaje indefinidamente hasta que el
+                  consumidor se recupere y envíe un ACK.</li>
+                <li><strong>Redis (Avance 1)</strong> es volátil: mensaje publicado sin consumidor activo = mensaje
+                  perdido para siempre.</li>
+              </ul>
+            </div>
+            <pre><code><span class="cmt">// svc-notificaciones — RabbitMQ consumer</span>
+<span class="kw">@EventPattern</span>(<span class="str">'stock.actualizar'</span>)
+<span class="kw">async</span> handleStockActualizar(
+    <span class="kw">@Payload</span>() data: StockPayload) {
+  <span class="kw">this</span>.logger.log(
+    <span class="str">`🐇 [RabbitMQ] Evento recibido`</span>
+  );
+  <span class="kw">await this</span>.service.procesarStock(data);
+}</code></pre>
+          </div>
+        </div>
+        <div class="tab-content" id="tab-compare">
+          <table class="data-table" style="margin-top:0.5rem;">
+            <thead>
+              <tr>
+                <th>Transporte</th>
+                <th>Tipo</th>
+                <th>Patrón</th>
+                <th>Entrega</th>
+                <th>Uso en ShopMS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color:#86efac;font-weight:700;">TCP NestJS</td>
+                <td>Síncrono</td>
+                <td>Req–Res</td>
+                <td>Alta (bloquea)</td>
+                <td>Gateway → svc-pedidos</td>
+              </tr>
+              <tr>
+                <td style="color:#fca5a5;font-weight:700;">Redis PUB/SUB</td>
+                <td>Asíncrono</td>
+                <td>Pub/Sub</td>
+                <td>Baja (volátil)</td>
+                <td>Notificación rápida de pedido</td>
+              </tr>
+              <tr>
+                <td style="color:var(--espe-gold);font-weight:700;">gRPC</td>
+                <td>Síncrono</td>
+                <td>RPC Tipado</td>
+                <td>Alta (timeout)</td>
+                <td>pedidos → productos (catálogo)</td>
+              </tr>
+              <tr>
+                <td style="color:#fdba74;font-weight:700;">RabbitMQ</td>
+                <td>Asíncrono</td>
+                <td>Cola Durable</td>
+                <td>Máxima (ACK)</td>
+                <td>Actualización crítica de stock</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 6 — AVANCE 3: SEGURIDAD Y OBSERVABILIDAD
+         ============================================================ -->
+    <div class="slide" id="slide-6">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">Avance 3</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Avance 3: Seguridad y Observabilidad</h2>
+        <span class="slide-subtitle">JWT, Guards y Sentry</span>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <h3 class="card-title">Autenticación y Autorización <span class="flow-badge b-jwt">JWT</span><span
+              class="flow-badge b-guard">Guard</span></h3>
+          <ul class="custom-list" style="margin-top:0.75rem;">
+            <li><strong>Política "Denegar por Defecto":</strong> El <code>JwtAuthGuard</code> global protege
+              absolutamente todas las rutas. Solo las decoradas con <code>@Public()</code> son accesibles sin token.
+            </li>
+            <li><strong>RBAC con RolesGuard:</strong> El <code>RolesGuard</code> valida el rol incluido en el payload
+              del JWT. Un <code>cliente</code> intentando crear un pedido (rol <code>admin</code>) recibe
+              <code>403 Forbidden</code>.
+            </li>
+            <li><strong>Stateless:</strong> Sin sesiones en BD. La validez se confirma matemáticamente en cada request
+              con <code>JWT_SECRET</code>. El token expira en 1 hora.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Monitoreo Activo <span class="flow-badge b-sentry">Sentry</span></h3>
+          <ul class="custom-list" style="margin-top:0.75rem;">
+            <li><strong>Filtrado Inteligente:</strong> Solo se reportan errores <strong>5xx</strong> (servidor). Los 4xx
+              (cliente) son ignorados conscientemente para no generar ruido en el panel de alertas.</li>
+            <li><strong>Contexto Enriquecido:</strong> Cada captura incluye el servicio de origen
+              (<code>service=gateway</code>), el transporte utilizado (<code>transport=HTTP</code>), la URL, el método y
+              el payload de la petición.</li>
+            <li><strong>Sin dependencia dura:</strong> Si <code>SENTRY_DSN</code> no está definido, los servicios
+              arrancan normalmente sin error ni advertencia.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 7 — TEMAS DE CLASE APLICADOS
+         ============================================================ -->
+    <div class="slide" id="slide-7">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">ShopMS — Proyecto Final</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Temas de Clase Aplicados</h2>
+        <span class="slide-subtitle">Patrones y Principios SOLID</span>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <h3 class="card-title" style="color:var(--espe-gold);">Patrones de Diseño</h3>
+          <table class="data-table" style="margin-top:0.4rem;font-size:0.83rem;">
+            <thead>
+              <tr>
+                <th>Patrón</th>
+                <th>Aplicación</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>API Gateway</strong></td>
+                <td>Punto de entrada único en <code>apps/gateway</code></td>
+              </tr>
+              <tr>
+                <td><strong>Proxy</strong></td>
+                <td>Delegación directa de peticiones sin lógica de negocio</td>
+              </tr>
+              <tr>
+                <td><strong>Pub/Sub</strong></td>
+                <td>Redis y RabbitMQ desacoplan emisores y consumidores</td>
+              </tr>
+              <tr>
+                <td><strong>Exception Filter</strong></td>
+                <td><code>AllExceptionsFilter</code> + <code>AllRpcExceptionsFilter</code></td>
+              </tr>
+              <tr>
+                <td><strong>Strategy + Guard</strong></td>
+                <td>Passport encapsula la validación; Guard la aplica antes del handler</td>
+              </tr>
+              <tr>
+                <td><strong>RBAC + Decorator</strong></td>
+                <td><code>@Public()</code> y <code>@Roles()</code> como metadatos dinámicos</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3 class="card-title" style="color:var(--espe-green-light);">Principios SOLID</h3>
+          <table class="data-table" style="margin-top:0.4rem;font-size:0.83rem;">
+            <thead>
+              <tr>
+                <th>Principio</th>
+                <th>Evidencia en el Código</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>SRP</strong></td>
+                <td>Cada microservicio tiene una única razón de cambio (catálogo ≠ pedidos)</td>
+              </tr>
+              <tr>
+                <td><strong>OCP</strong></td>
+                <td>Se añadieron RabbitMQ y Sentry sin modificar la lógica de negocio existente</td>
+              </tr>
+              <tr>
+                <td><strong>ISP</strong></td>
+                <td>El stub gRPC en svc-pedidos solo declara los métodos que utiliza</td>
+              </tr>
+              <tr>
+                <td><strong>DIP</strong></td>
+                <td>Todos los servicios dependen de <code>ClientProxy</code> (abstracción), no de la implementación TCP
+                  concreta</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 8 — DEMO RUNBOOK
+         ============================================================ -->
+    <div class="slide" id="slide-8">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">Demo en Vivo</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Runbook de la Demo en Vivo</h2>
+        <span class="slide-subtitle">Guion de Defensa</span>
+      </div>
+      <div class="slide-content">
+        <div class="runbook-step">
+          <div class="runbook-num">1</div>
+          <div class="runbook-detail">
+            <div class="runbook-title">Levantar la infraestructura completa</div>
+            <div class="runbook-cmd-container">
+              <div class="runbook-cmd" id="cmd-1">docker compose -f docker-compose.final.yml up -d --build</div>
+              <button class="runbook-copy tooltip" onclick="copyCmd('cmd-1',this)"><svg width="13" height="13"
+                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="runbook-step">
+          <div class="runbook-num">2</div>
+          <div class="runbook-detail">
+            <div class="runbook-title">Obtener token JWT (admin / admin123)</div>
+            <div class="runbook-cmd-container">
+              <div class="runbook-cmd" id="cmd-2">curl -X POST http://localhost:3000/api/auth/login -H "Content-Type:
+                application/json" -d '{"username":"admin","password":"admin123"}'</div>
+              <button class="runbook-copy tooltip" onclick="copyCmd('cmd-2',this)"><svg width="13" height="13"
+                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="runbook-step">
+          <div class="runbook-num">3</div>
+          <div class="runbook-detail">
+            <div class="runbook-title">Sin token → demostrar 401 (Guard activo)</div>
+            <div class="runbook-cmd-container">
+              <div class="runbook-cmd" id="cmd-3">curl http://localhost:3000/api/pedidos</div>
+              <button class="runbook-copy tooltip" onclick="copyCmd('cmd-3',this)"><svg width="13" height="13"
+                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="runbook-step">
+          <div class="runbook-num">4</div>
+          <div class="runbook-detail">
+            <div class="runbook-title">Crear pedido con token admin (activa TCP, gRPC, Redis, RabbitMQ)</div>
+            <div class="runbook-cmd-container">
+              <div class="runbook-cmd" id="cmd-4">curl -X POST http://localhost:3000/api/pedidos -H "Content-Type:
+                application/json" -H "Authorization: Bearer &lt;TOKEN&gt;" -d '{"productoId":1,"cantidad":2}'</div>
+              <button class="runbook-copy tooltip" onclick="copyCmd('cmd-4',this)"><svg width="13" height="13"
+                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="runbook-step">
+          <div class="runbook-num">5</div>
+          <div class="runbook-detail">
+            <div class="runbook-title">Detener svc-productos → forzar 503 → ver error en Sentry</div>
+            <div class="runbook-cmd-container">
+              <div class="runbook-cmd" id="cmd-5">docker compose -f docker-compose.final.yml stop ms-productos && curl
+                -H "Authorization: Bearer &lt;TOKEN&gt;" http://localhost:3000/api/pedidos</div>
+              <button class="runbook-copy tooltip" onclick="copyCmd('cmd-5',this)"><svg width="13" height="13"
+                  fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 9 — CONCLUSIONES
+         ============================================================ -->
+    <div class="slide" id="slide-9">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">ShopMS — Proyecto Final</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Conclusiones y Lecciones Aprendidas</h2>
+        <span class="slide-subtitle">Cierre Metodológico</span>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <h3 class="card-title">Aprendizajes Técnicos</h3>
+          <ul class="custom-list" style="margin-top:0.75rem;">
+            <li><strong>No existe un transporte universal:</strong> gRPC provee contratos fuertes para validaciones
+              síncronas críticas; RabbitMQ garantiza la integridad del stock con colas durables; Redis ofrece velocidad
+              para alertas no críticas.</li>
+            <li><strong>El Gateway como capa de seguridad central:</strong> Autenticar y autorizar en el Gateway
+              descarga a todos los microservicios internos de procesamiento de tokens.</li>
+            <li><strong>Observabilidad inteligente:</strong> Monitorear no es guardar todo — filtrar 4xx de Sentry
+              elimina el ruido y enfoca las alertas en fallas reales de infraestructura.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Mejora del Proceso</h3>
+          <ul class="custom-list" style="margin-top:0.75rem;">
+            <li><strong>Deuda Git reconocida:</strong> En los Avances 1 y 2, el código se subió en commits gigantescos a
+              <code>main</code>. Se documenta con honestidad para el jurado.
+            </li>
+            <li><strong>Corrección (Avance 3):</strong> Implementación real de GitHub Flow: ramas de trabajo, Pull
+              Requests con revisión cruzada, commits incrementales con identidad de los tres integrantes.</li>
+            <li><strong>Kanban vinculado:</strong> Tarjetas ligadas a Issues y PRs del repositorio, tablero público para
+              auditoría.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 10 — EVIDENCIAS DEL SISTEMA
+         ============================================================ -->
+    <div class="slide" id="slide-10">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">Evidencias</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Evidencias del Sistema Funcionando</h2>
+        <span class="slide-subtitle">Capturas de Pantalla Reales</span>
+      </div>
+      <div class="slide-content">
+        <div class="evidencias-grid">
+
+          <div class="ev-card" onclick="openLightbox('/docs/latencia.png')">
+            <img src="/docs/latencia.png" alt="Benchmark latencia síncrona"
+              onerror="this.style.background='#1a3323';this.style.minHeight='140px';this.alt='';">
+            <div class="ev-card-label">Benchmark — Latencia Síncrona TCP</div>
+            <div class="ev-card-sub">Avance 1 · 200 peticiones · avg 3.98 ms → 4.86 ms</div>
+          </div>
+
+          <div class="ev-card" onclick="openLightbox('/docs/latencia%20asincr.png')">
+            <img src="/docs/latencia%20asincr.png" alt="Benchmark latencia asíncrona Redis"
+              onerror="this.style.background='#1a3323';this.style.minHeight='140px';this.alt='';">
+            <div class="ev-card-label">Benchmark — Latencia Asíncrona Redis</div>
+            <div class="ev-card-sub">Avance 1 · 200 peticiones · avg 2.21 ms (Redis PUBLISH)</div>
+          </div>
+
+          <div class="ev-card" onclick="openLightbox('/docs/svc-productos%20apagado.png')">
+            <img src="/docs/svc-productos%20apagado.png" alt="Contenedores Docker con svc-productos detenido"
+              onerror="this.style.background='#1a3323';this.style.minHeight='140px';this.alt='';">
+            <div class="ev-card-label">Docker — svc-productos Apagado</div>
+            <div class="ev-card-sub">Avance 1 · Demostración de acoplamiento temporal</div>
+          </div>
+
+          <div class="ev-card" onclick="openLightbox('/docs/verificacion%20pedido.png')">
+            <img src="/docs/verificacion%20pedido.png" alt="Error 503 en cadena síncrona"
+              onerror="this.style.background='#1a3323';this.style.minHeight='140px';this.alt='';">
+            <div class="ev-card-label">503 — Cadena Síncrona Falla</div>
+            <div class="ev-card-sub">Avance 1 · GET /api/pedidos → 503 con svc-productos caído</div>
+          </div>
+
+          <div class="ev-card" onclick="openLightbox('/docs/caida-asincrona.png')">
+            <img src="/docs/caida-asincrona.png" alt="201 OK en flujo asíncrono con svc-productos caído"
+              onerror="this.style.background='#1a3323';this.style.minHeight='140px';this.alt='';">
+            <div class="ev-card-label">201 OK — Redis No Se Ve Afectado</div>
+            <div class="ev-card-sub">Avance 1 · POST /api/pedidos/notificar → 201 aunque svc-productos esté caído</div>
+          </div>
+
+          <div class="ev-card" onclick="openLightbox('/docs/kanban-avance1.png')">
+            <img src="/docs/kanban-avance1.png" alt="Tablero Kanban del proyecto"
+              onerror="this.style.background='#1a3323';this.style.minHeight='140px';this.alt='';">
+            <div class="ev-card-label">GitHub Projects — Kanban</div>
+            <div class="ev-card-sub">Proceso · 8 tarjetas completadas en el Avance 1</div>
+          </div>
+
+        </div>
+        <p style="text-align:center;font-size:0.78rem;color:var(--text-dark);margin-top:0.75rem;">Haz clic en cualquier
+          imagen para ampliarla</p>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         SLIDE 11 — Q&A PREGUNTAS DEL JURADO
+         ============================================================ -->
+    <div class="slide" id="slide-11">
+      <div class="uni-header">
+        <img class="uni-header-seal" src="espe_seal.png" alt="ESPE">
+        <div class="uni-header-text">
+          <span class="uni-header-name">Universidad de las Fuerzas Armadas ESPE</span>
+          <span class="uni-header-dept">Aplicaciones Distribuidas · 7.º Semestre</span>
+        </div>
+        <div class="uni-header-spacer"></div>
+        <span class="uni-header-badge">Preguntas del Jurado</span>
+      </div>
+      <div class="slide-header">
+        <h2 class="slide-title">Defensa de Arquitectura: Q&amp;A</h2>
+        <span class="slide-subtitle">Preguntas Probables y Respuestas Preparadas</span>
+      </div>
+      <div class="slide-content">
+        <div class="qa-container">
+          <div class="qa-item">
+            <div class="qa-question">¿Qué información viaja dentro de un JWT y cómo se valida en el servidor?</div>
+            <div class="qa-answer">
+              <div class="qa-answer-content">El token JWT tiene tres partes en Base64 URL:
+                <code>Header.Payload.Signature</code>. El payload contiene <strong>sub</strong> (ID),
+                <strong>username</strong> y <strong>rol</strong>. El <code>JwtStrategy</code> recalcula la firma con
+                <code>JWT_SECRET</code> en cada petición — si coincide y el token no expiró, inyecta el payload en
+                <code>request.user</code>. Stateless: sin sesión en base de datos.
+              </div>
+            </div>
+          </div>
+          <div class="qa-item">
+            <div class="qa-question">¿Cuál es la diferencia entre un Guard de NestJS y un Middleware?</div>
+            <div class="qa-answer">
+              <div class="qa-answer-content">Un <strong>middleware</strong> corre antes del enrutamiento, sin
+                visibilidad del handler de destino ni de sus decoradores. Un <strong>Guard</strong> corre después del
+                routing pero antes del handler, con acceso al <code>ExecutionContext</code>, lo que le permite leer
+                metadatos como <code>@Public()</code> o <code>@Roles('admin')</code> para aplicar políticas de acceso
+                finas (401/403).</div>
+            </div>
+          </div>
+          <div class="qa-item">
+            <div class="qa-question">¿Por qué gRPC en el salto pedidos → productos y no TCP simple o eventos?</div>
+            <div class="qa-answer">
+              <div class="qa-answer-content">1) <strong>Contract-First:</strong> el archivo <code>.proto</code>
+                compartido garantiza tipado estricto y detecta cambios de esquema en compilación, no en ejecución. 2) La
+                creación del pedido <strong>requiere confirmar la disponibilidad del producto antes de
+                  persistir</strong> — un evento asíncrono no sirve porque no hay respuesta de confirmación.</div>
+            </div>
+          </div>
+          <div class="qa-item">
+            <div class="qa-question">¿Por qué RabbitMQ para el stock y Redis para las notificaciones?</div>
+            <div class="qa-answer">
+              <div class="qa-answer-content"><strong>Redis Pub/Sub</strong> es volátil: si el consumidor está apagado
+                cuando se publica, el mensaje se pierde. La actualización de stock es crítica — no se puede perder
+                datos. <strong>RabbitMQ</strong> usa colas durables: persiste el mensaje en disco hasta recibir el ACK
+                del consumidor, garantizando la consistencia eventual incluso ante caídas temporales del servicio.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end slides-container -->
+
+  <!-- Lightbox for evidence images -->
+  <div id="ev-lightbox" onclick="closeLightbox()">
+    <img id="ev-lightbox-img" src="" alt="Evidencia ampliada">
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav-controls">
+    <button class="nav-btn" id="prevBtn" onclick="prevSlide()" disabled>◀</button>
+    <div class="slide-counter" id="slideCounter">1 / 10</div>
+    <button class="nav-btn" id="nextBtn" onclick="nextSlide()">▶</button>
+  </div>
+  <div class="keyboard-hint">
+    <span>Navegación:</span>
+    <kbd class="key-badge">◀</kbd>
+    <kbd class="key-badge">▶</kbd>
+    <kbd class="key-badge">Espacio</kbd>
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT CONTROLLER
+       ============================================================ -->
+  <script>
+    let idx = 0;
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const counter = document.getElementById('slideCounter');
+    const bar = document.getElementById('progressBar');
+
+    function updateSlides() {
+      slides.forEach((s, i) => {
+        s.classList.remove('active', 'exit-left');
+        if (i === idx) s.classList.add('active');
+        else if (i < idx) s.classList.add('exit-left');
+      });
+      counter.innerText = `${idx + 1} / ${slides.length}`;
+      bar.style.width = `${(idx / (slides.length - 1)) * 100}%`;
+      prevBtn.disabled = idx === 0;
+      nextBtn.disabled = idx === slides.length - 1;
+      window.location.hash = `slide-${idx + 1}`;
+    }
+
+    function nextSlide() { if (idx < slides.length - 1) { idx++; updateSlides(); } }
+    function prevSlide() { if (idx > 0) { idx--; updateSlides(); } }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+      else if (e.key === 'ArrowLeft') prevSlide();
+    });
+
+    // Hash routing
+    function handleHash() {
+      const n = parseInt(window.location.hash.replace('#slide-', ''));
+      if (!isNaN(n) && n >= 1 && n <= slides.length) { idx = n - 1; updateSlides(); }
+    }
+    window.addEventListener('hashchange', handleHash);
+    if (window.location.hash) handleHash(); else updateSlides();
+
+    // ── Architecture diagram flows ──────────────────────────
+    // IMPORTANT: activate() targets the first <rect>/<path> INSIDE the group,
+    // NOT the <g> itself, to avoid CSS filter bleeding into sibling <text> elements
+    // which was causing text to appear bold/thick.
+    function activateNode(id) {
+      const g = document.getElementById(id);
+      if (!g) return;
+      const shape = g.querySelector('rect, path, circle, ellipse');
+      if (shape) shape.classList.add('svg-node-active');
+    }
+    function cleanDiagram() {
+      document.querySelectorAll('.svg-node-active').forEach(el => el.classList.remove('svg-node-active'));
+      document.querySelectorAll('.svg-link').forEach(l => l.classList.remove('active-flow', 'flow-sync', 'flow-redis', 'flow-grpc', 'flow-rmq'));
+    }
+    function activateLink(id, flowClass) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active-flow', flowClass);
+    }
+
+    document.querySelectorAll('.arch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.arch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        cleanDiagram();
+
+        const f = btn.dataset.flow;
+        if (f === 'sync-tcp') {
+          ['link-client-gateway', 'link-gateway-pedidos', 'link-pedidos-produtos-tcp', 'link-pedidos-produtos-tcp'].forEach(id => activateLink(id, 'flow-sync'));
+          activateLink('link-client-gateway', 'flow-sync');
+          activateLink('link-gateway-pedidos', 'flow-sync');
+          activateLink('link-pedidos-produtos-tcp', 'flow-sync');
+          activateLink('link-pedidos-productos-tcp', 'flow-sync');
+          ['node-client', 'node-gateway', 'node-pedidos', 'node-productos'].forEach(activateNode);
+        } else if (f === 'async-redis') {
+          activateLink('link-client-gateway', 'flow-redis');
+          activateLink('link-gateway-pedidos', 'flow-redis');
+          activateLink('link-pedidos-redis', 'flow-redis');
+          activateLink('link-redis-notif', 'flow-redis');
+          ['node-client', 'node-gateway', 'node-pedidos', 'node-redis', 'node-notificaciones'].forEach(activateNode);
+        } else if (f === 'grpc-flow') {
+          activateLink('link-client-gateway', 'flow-grpc');
+          activateLink('link-gateway-pedidos', 'flow-grpc');
+          activateLink('link-pedidos-productos-grpc', 'flow-grpc');
+          ['node-pedidos', 'node-productos'].forEach(activateNode);
+        } else if (f === 'rabbitmq-flow') {
+          activateLink('link-client-gateway', 'flow-rmq');
+          activateLink('link-gateway-pedidos', 'flow-rmq');
+          activateLink('link-pedidos-rabbitmq', 'flow-rmq');
+          activateLink('link-rabbitmq-notif', 'flow-rmq');
+          ['node-pedidos', 'node-rabbitmq', 'node-notificaciones'].forEach(activateNode);
+        }
+      });
+    });
+
+    // ── Tabs controller (Slide 5) ────────────────────────────
+    document.querySelectorAll('.tab-header').forEach(h => {
+      h.addEventListener('click', () => {
+        document.querySelectorAll('.tab-header').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+        h.classList.add('active');
+        document.getElementById(`tab-${h.dataset.tab}`).classList.add('active');
+      });
+    });
+
+    // ── Copy to clipboard ───────────────────────────────────
+    function copyCmd(id, btn) {
+      navigator.clipboard.writeText(document.getElementById(id).innerText).then(() => {
+        btn.classList.add('show-tooltip');
+        setTimeout(() => btn.classList.remove('show-tooltip'), 1600);
+      });
+    }
+
+    // ── Q&A Accordion ───────────────────────────────────────
+    document.querySelectorAll('.qa-question').forEach(q => {
+      q.addEventListener('click', () => {
+        const item = q.parentElement;
+        const ans = item.querySelector('.qa-answer');
+        const open = item.classList.contains('active');
+        document.querySelectorAll('.qa-item').forEach(i => {
+          i.classList.remove('active');
+          i.querySelector('.qa-answer').style.maxHeight = null;
+        });
+        if (!open) {
+          item.classList.add('active');
+          ans.style.maxHeight = ans.scrollHeight + 'px';
+        }
+      });
+    });
+
+    // ── Lightbox for evidence images ────────────────────────
+    function openLightbox(src) {
+      document.getElementById('ev-lightbox-img').src = src;
+      document.getElementById('ev-lightbox').classList.add('open');
+    }
+    function closeLightbox() {
+      document.getElementById('ev-lightbox').classList.remove('open');
+      document.getElementById('ev-lightbox-img').src = '';
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+  </script>
+</body>
+
+</html>
